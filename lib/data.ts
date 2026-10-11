@@ -8,13 +8,15 @@ export type Venue = {
   facilities: string[];
   slots: string[];
   price: number;
+  price_per_hour?: number;
+  total_courts?: number; // <--- Add this property
   rating?: number;
   image?: string;
+  image_url?: string;
   location?: string;
   tag?: string;
   reviews?: number;
   description?: string;
-  image_url?: string;
 };
 
 export type Coach = {

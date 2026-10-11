@@ -59,11 +59,46 @@ export default function Home() {
     return sportMatch && queryMatch && areaMatch && priceMatch;
   }), [venues, activeSport, query, area, maxPrice]);
 
-  function makeBooking() {
-    if (!selected) return;
-    const booking: Booking = { id: `MO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`, venue: selected.name, sport: selected.sport, date: selectedDate, time: selectedTime, price: selected.price, status: 'Confirmed' };
-    setBookings(old => [booking, ...old]); setConfirmed(booking); setSelected(null);
+  async function makeBooking() {
+  if (!selected) return;
+
+  const bookingData = {
+    booking_code: `MO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+    venue_id: selected.id,
+    venue_name: selected.name,
+    sport: selected.sport,
+    booking_date: selectedDate,
+    booking_time: selectedTime,
+    price: selected.price,
+    status: 'Confirmed',
+  };
+
+  // Write record directly to Supabase
+  const { data, error } = await supabase
+    .from('bookings')
+    .insert([bookingData])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error inserting booking into Supabase:', error.message || error);
   }
+
+  // Update UI state with created booking
+  const booking: Booking = {
+    id: bookingData.booking_code,
+    venue: selected.name,
+    sport: selected.sport,
+    date: selectedDate,
+    time: selectedTime,
+    price: selected.price,
+    status: 'Confirmed',
+  };
+
+  setBookings((old) => [booking, ...old]);
+  setConfirmed(booking);
+  setSelected(null);
+}
   function openVenue(v: Venue) { setSelected(v); setSelectedTime(v.slots.includes('18:00') ? '18:00' : (v.slots[0] || '18:00')); }
 
   return <main className="min-h-screen overflow-hidden">
@@ -122,7 +157,21 @@ export default function Home() {
 
     <footer className="border-t border-black/10 bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8"><button className="flex items-center gap-2 self-start" onClick={() => {setShowDashboard(false);window.scrollTo({top:0,behavior:'smooth'})}}><span className="grid h-8 w-8 place-items-center rounded-full bg-[#101310] text-[#d8ff3e]"><Zap size={17} fill="currentColor"/></span><span className="text-xl font-black tracking-[-.08em]">motion.</span></button><p className="text-xs text-black/45">© 2026 Motion. Built for the love of the game.</p><p className="rounded-full bg-[#f7f8f4] px-3 py-2 text-[10px] font-black tracking-[.12em] text-black/50">PROTOTYPE · SAMPLE DATA ONLY</p></div></footer>
 
-    {selected && <VenueModal venue={selected} date={selectedDate} setDate={setSelectedDate} time={selectedTime} setTime={setSelectedTime} onClose={() => setSelected(null)} onBook={makeBooking}/>}
+    {selected && (
+  <VenueModal
+    venue={selected}
+    date={selectedDate}
+    setDate={setSelectedDate}
+    time={selectedTime}
+    setTime={setSelectedTime}
+    onClose={() => setSelected(null)}
+    onBookSuccess={(newBooking) => {
+      setBookings((old) => [newBooking, ...old]);
+      setConfirmed(newBooking);
+      setSelected(null);
+    }}
+  />
+)}
     {confirmed && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true"><div className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9"><div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]"><Check size={30} strokeWidth={3}/></div><p className="mt-6 text-xs font-black uppercase tracking-[.2em] text-[#81971d]">DEMO BOOKING CREATED</p><h2 className="mt-2 text-3xl font-black tracking-tight">You're in. Game on!</h2><p className="mt-2 text-sm leading-6 text-black/55">This is a sample reservation only. No venue has been contacted and no payment was taken.</p><div className="mt-6 rounded-2xl bg-[#f7f8f4] p-4"><div className="flex items-start justify-between gap-3"><div><p className="font-extrabold">{confirmed.venue}</p><p className="mt-1 text-sm text-black/50">{confirmed.sport}</p></div><span className="rounded-full bg-[#e7f3bc] px-3 py-1 text-[10px] font-black">{confirmed.id}</span></div><div className="mt-4 grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-black/45">Date</p><p className="mt-1 font-bold">{confirmed.date}</p></div><div><p className="text-xs text-black/45">Time</p><p className="mt-1 font-bold">{confirmed.time}–{String(Number(confirmed.time.slice(0,2))+1).padStart(2,'0')}:00</p></div></div><div className="mt-4 flex justify-between border-t border-black/10 pt-3 text-sm"><span className="text-black/50">Demo total</span><span className="font-black">{money(confirmed.price)}</span></div></div><div className="mt-6 flex gap-3"><button onClick={() => {setConfirmed(null);setShowDashboard(true)}} className="flex-1 rounded-full bg-[#101310] px-4 py-3 text-sm font-bold text-white">View bookings</button><button onClick={() => setConfirmed(null)} className="rounded-full border border-black/15 px-4 py-3 text-sm font-bold">Done</button></div></div></div>}
   </main>;
 }
@@ -131,8 +180,291 @@ function VenueCard({ venue, onSelect }: { venue: Venue; onSelect: () => void }) 
   return <article className="group cursor-pointer" onClick={onSelect}><div className="relative overflow-hidden rounded-2xl bg-[#e8ebdf]"><img src={venue.image || DEFAULT_IMG} alt={`${venue.sport} at ${venue.name}`} className="h-56 w-full object-cover transition duration-500 group-hover:scale-[1.04]"/>{venue.tag && <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-2 text-[9px] font-black tracking-[.13em]">{venue.tag}</span>}<span className="absolute bottom-3 right-3 grid h-10 w-10 place-items-center rounded-full bg-[#d8ff3e] transition group-hover:rotate-45"><ArrowUpRight size={19}/></span></div><div className="pt-4"><div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[.15em] text-[#81971d]">{venue.sport}</p><h3 className="mt-1 text-xl font-black tracking-tight">{venue.name}</h3></div><div className="flex items-center gap-1 pt-1 text-xs font-extrabold"><Star size={13} fill="#d6a927" stroke="#d6a927"/>{venue.rating || 'New'}<span className="font-medium text-black/35">({venue.reviews || 0})</span></div></div><p className="mt-2 flex items-center gap-1.5 text-sm text-black/50"><MapPin size={14}/>{venue.area}</p><div className="mt-4 flex items-end justify-between border-t border-black/10 pt-3"><div><span className="text-xl font-black">{money(venue.price)}</span><span className="text-xs text-black/45"> / hour</span></div><span className="text-xs font-bold">View court <ArrowRight className="ml-1 inline" size={14}/></span></div></div></article>;
 }
 
-function VenueModal({ venue, date, setDate, time, setTime, onClose, onBook }: { venue: Venue; date: string; setDate: (v:string)=>void; time: string; setTime: (v:string)=>void; onClose: ()=>void; onBook: ()=>void }) {
-  return <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`${venue.name} booking details`}><div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl"><div className="relative h-52 sm:h-64"><img src={venue.image || DEFAULT_IMG} alt={venue.name} className="h-full w-full object-cover"/><button onClick={onClose} className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white"><X size={19}/></button><span className="absolute bottom-4 left-4 rounded-full bg-[#d8ff3e] px-3 py-2 text-[10px] font-black tracking-widest">{venue.sport.toUpperCase()}</span></div><div className="grid gap-7 p-5 sm:grid-cols-[1fr_.9fr] sm:p-8"><div><p className="flex items-center gap-1 text-xs font-bold text-black/50"><MapPin size={14}/>{venue.area}</p><h2 className="mt-2 text-3xl font-black tracking-tight">{venue.name}</h2><div className="mt-2 flex items-center gap-1 text-sm"><Star size={15} fill="#d6a927" stroke="#d6a927"/><b>{venue.rating || 'New'}</b><span className="text-black/45">({venue.reviews || 0} reviews · sample data)</span></div><p className="mt-5 text-sm leading-6 text-black/60">{venue.description || 'No description provided.'}</p><h3 className="mt-6 font-extrabold">Court facilities</h3><div className="mt-3 flex flex-wrap gap-2">{venue.facilities.map(f => <span key={f} className="rounded-full bg-[#f2f4ed] px-3 py-2 text-xs font-semibold">{f}</span>)}</div><div className="mt-6 flex items-start gap-2 rounded-xl border border-[#e2e9c8] bg-[#f8fbeF] p-3 text-xs leading-5 text-black/60"><ShieldCheck size={17} className="shrink-0 text-[#72871b]"/>Demo listing. Availability is illustrative and is not connected to the venue.</div></div><div><div className="flex items-end justify-between"><h3 className="text-lg font-black">Book a time</h3><p><b className="text-xl">{money(venue.price)}</b><span className="text-xs text-black/45">/hr</span></p></div><label className="mt-5 block text-xs font-bold text-black/55">SELECT DATE<input type="date" value={date} min={dateLabel(today)} onChange={e => setDate(e.target.value)} className="mt-2 w-full rounded-xl border border-black/10 bg-[#f7f8f4] px-3 py-3 text-sm font-semibold outline-none focus:border-black/40"/></label><p className="mt-5 text-xs font-bold text-black/55">AVAILABLE DEMO SLOTS</p><div className="mt-3 grid grid-cols-3 gap-2">{venue.slots.map(s => <button key={s} onClick={() => setTime(s)} className={`rounded-xl border px-2 py-3 text-sm font-bold ${time === s ? 'border-[#101310] bg-[#101310] text-white' : 'border-black/10 hover:border-black/40'}`}>{s}</button>)}</div><div className="mt-5 flex items-center justify-between border-t border-black/10 pt-4 text-sm"><span className="text-black/55">1 hour · Demo total</span><b className="text-lg">{money(venue.price)}</b></div><button onClick={onBook} disabled={!date || date < dateLabel(today) || !venue.slots.includes(time)} className="mt-4 w-full rounded-full bg-[#d8ff3e] px-5 py-4 text-sm font-black transition hover:bg-[#c9f02e] disabled:cursor-not-allowed disabled:opacity-50">Confirm demo booking <ArrowRight className="ml-2 inline" size={17}/></button><p className="mt-3 text-center text-[10px] leading-4 text-black/40">No payment. No real reservation. For prototype testing only.</p></div></div></div></div>;
+function VenueModal({
+  venue,
+  date,
+  setDate,
+  time,
+  setTime,
+  onClose,
+  onBookSuccess,
+}: {
+  venue: Venue;
+  date: string;
+  setDate: (v: string) => void;
+  time: string;
+  setTime: (v: string) => void;
+  onClose: () => void;
+  onBookSuccess: (booking: Booking) => void;
+}) {
+  const [customerName, setCustomerName] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [bookedCount, setBookedCount] = useState<number>(0);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const totalCourts = venue.total_courts || 1; // Fallback to 1 if not set in DB
+
+  // Fetch how many bookings exist for this venue + date + time
+  useEffect(() => {
+    async function checkSlotCapacity() {
+      if (!venue.id || !date || !time) return;
+      setCheckingAvailability(true);
+
+      const { count, error } = await supabase
+        .from('bookings')
+        .select('*', { count: 'exact', head: true })
+        .eq('venue_id', venue.id)
+        .eq('booking_date', date)
+        .eq('booking_time', time)
+        .neq('status', 'Cancelled');
+
+      if (!error && count !== null) {
+        setBookedCount(count);
+      }
+      setCheckingAvailability(false);
+    }
+
+    checkSlotCapacity();
+  }, [venue.id, date, time]);
+
+  const isFullyBooked = bookedCount >= totalCourts;
+  const isFormValid =
+    date &&
+    date >= dateLabel(today) &&
+    venue.slots.includes(time) &&
+    customerName.trim().length > 0 &&
+    customerEmail.trim().length > 0 &&
+    !isFullyBooked;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!isFormValid || submitting) return;
+
+    setSubmitting(true);
+    setErrorMsg('');
+
+    // Double check capacity right before inserting
+    const { count } = await supabase
+      .from('bookings')
+      .select('*', { count: 'exact', head: true })
+      .eq('venue_id', venue.id)
+      .eq('booking_date', date)
+      .eq('booking_time', time)
+      .neq('status', 'Cancelled');
+
+    if (count !== null && count >= totalCourts) {
+      setErrorMsg('Sorry! Someone just booked the last court for this time slot.');
+      setBookedCount(count);
+      setSubmitting(false);
+      return;
+    }
+
+    const bookingCode = `MO-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+
+    const { error } = await supabase.from('bookings').insert([
+      {
+        booking_code: bookingCode,
+        venue_id: venue.id,
+        venue_name: venue.name,
+        sport: venue.sport,
+        booking_date: date,
+        booking_time: time,
+        price: venue.price,
+        customer_name: customerName,
+        customer_email: customerEmail,
+        status: 'Confirmed',
+      },
+    ]);
+
+    if (error) {
+      console.error('Error creating booking:', error.message || error);
+      setErrorMsg('Failed to save booking. Please try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    const newBooking: Booking = {
+      id: bookingCode,
+      venue: venue.name,
+      sport: venue.sport,
+      date,
+      time,
+      price: venue.price,
+      status: 'Confirmed',
+    };
+
+    setSubmitting(false);
+    onBookSuccess(newBooking);
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl">
+        <div className="relative h-52 sm:h-64">
+          <img
+            src={venue.image || DEFAULT_IMG}
+            alt={venue.name}
+            className="h-full w-full object-cover"
+          />
+          <button
+            onClick={onClose}
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-black hover:bg-gray-100"
+          >
+            <X size={19} />
+          </button>
+          <span className="absolute bottom-4 left-4 rounded-full bg-[#d8ff3e] px-3 py-2 text-[10px] font-black tracking-widest text-black">
+            {venue.sport.toUpperCase()}
+          </span>
+        </div>
+
+        <div className="grid gap-7 p-5 sm:grid-cols-[1fr_.95fr] sm:p-8">
+          {/* Venue Info */}
+          <div>
+            <p className="flex items-center gap-1 text-xs font-bold text-black/50">
+              <MapPin size={14} />
+              {venue.area}
+            </p>
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-black">{venue.name}</h2>
+            <div className="mt-2 flex items-center gap-1 text-sm text-black">
+              <Star size={15} fill="#d6a927" stroke="#d6a927" />
+              <b>{venue.rating || 'New'}</b>
+              <span className="text-black/45">({venue.reviews || 0} reviews)</span>
+            </div>
+
+            <p className="mt-5 text-sm leading-6 text-black/60">
+              {venue.description || 'No description provided.'}
+            </p>
+
+            <h3 className="mt-6 font-extrabold text-black">Court facilities</h3>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {venue.facilities.map((f) => (
+                <span
+                  key={f}
+                  className="rounded-full bg-[#f2f4ed] px-3 py-2 text-xs font-semibold text-black"
+                >
+                  {f}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-6 flex items-start gap-2 rounded-xl border border-[#e2e9c8] bg-[#f8fbeF] p-3 text-xs leading-5 text-black/60">
+              <ShieldCheck size={17} className="shrink-0 text-[#72871b]" />
+              Total Courts Available: <b className="text-black ml-1">{totalCourts}</b>
+            </div>
+          </div>
+
+          {/* Booking & Details Form */}
+          <form onSubmit={handleSubmit} className="rounded-2xl bg-[#f7f8f4] p-5 border border-black/10">
+            <div className="flex items-end justify-between border-b border-black/10 pb-3">
+              <h3 className="text-lg font-black text-black">Book a time</h3>
+              <p className="text-black">
+                <b className="text-xl">{money(venue.price)}</b>
+                <span className="text-xs text-black/45">/hr</span>
+              </p>
+            </div>
+
+            {/* Date Select */}
+            <label className="mt-4 block text-xs font-bold text-black/55 uppercase">
+              Select Date
+              <input
+                type="date"
+                value={date}
+                min={dateLabel(today)}
+                onChange={(e) => setDate(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-black/10 bg-white px-3 py-2.5 text-sm font-semibold text-black outline-none focus:border-black/40"
+              />
+            </label>
+
+            {/* Time Slot Select */}
+            <p className="mt-4 text-xs font-bold text-black/55 uppercase">Available Slots</p>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {venue.slots.map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  onClick={() => setTime(s)}
+                  className={`rounded-xl border px-2 py-2.5 text-sm font-bold transition ${
+                    time === s
+                      ? 'border-[#101310] bg-[#101310] text-white'
+                      : 'border-black/10 bg-white text-black hover:border-black/40'
+                  }`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            {/* Capacity Warning Banner */}
+            <div className="mt-3 text-xs">
+              {checkingAvailability ? (
+                <p className="text-black/50">Checking slot availability...</p>
+              ) : isFullyBooked ? (
+                <p className="font-bold text-red-600 bg-red-50 p-2 rounded-lg border border-red-200">
+                  ⚠️ Fully booked! ({bookedCount}/{totalCourts} courts taken at {time})
+                </p>
+              ) : (
+                <p className="text-[#687e14] font-semibold">
+                  ✓ {totalCourts - bookedCount} court(s) remaining for {time}
+                </p>
+              )}
+            </div>
+
+            {/* User Contact Details Inputs */}
+            <div className="mt-4 border-t border-black/10 pt-4 space-y-3">
+              <p className="text-xs font-extrabold text-black uppercase tracking-wider">Your Details</p>
+              <label className="block text-xs font-bold text-black/60">
+                Full Name *
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Alex Tan"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none focus:border-black/40"
+                />
+              </label>
+
+              <label className="block text-xs font-bold text-black/60">
+                Email / Phone *
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. alex@example.com"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-sm text-black outline-none focus:border-black/40"
+                />
+              </label>
+            </div>
+
+            {errorMsg && (
+              <p className="mt-3 text-xs font-bold text-red-600">{errorMsg}</p>
+            )}
+
+            <div className="mt-4 flex items-center justify-between border-t border-black/10 pt-3 text-sm">
+              <span className="text-black/55">1 hour total</span>
+              <b className="text-lg text-black">{money(venue.price)}</b>
+            </div>
+
+            <button
+              type="submit"
+              disabled={!isFormValid || submitting}
+              className="mt-4 w-full rounded-full bg-[#d8ff3e] px-5 py-3.5 text-sm font-black text-black transition hover:bg-[#c9f02e] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? 'Confirming...' : 'Confirm booking'}
+              {!submitting && <ArrowRight className="ml-2 inline" size={17} />}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Dashboard({ bookings, venues, onBack, onCancel }: { bookings: Booking[]; venues: Venue[]; onBack: ()=>void; onCancel: (id:string)=>void }) {
