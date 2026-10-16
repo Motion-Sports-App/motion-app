@@ -209,8 +209,8 @@ export default function Home() {
             </button>
           </nav>
 
-          {/* Header Action Controls */}
-          <div className="hidden items-center gap-3 sm:flex">
+          {/* Header Action Controls (Visible on BOTH Mobile & Desktop) */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {user ? (
               <AccountDropdown 
                 user={user} 
@@ -223,24 +223,24 @@ export default function Home() {
             ) : (
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="rounded-full bg-[#101310] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-[#30372a]"
+                className="rounded-full bg-[#101310] px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-white transition hover:bg-[#30372a]"
               >
-                Sign In / Sign Up
+                Sign In
               </button>
             )}
 
             <button
               onClick={() => handleNavigate('explore')}
-              className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#c9f02e]"
+              className="hidden sm:flex rounded-full bg-[#d8ff3e] px-5 py-2.5 text-sm font-bold text-black transition hover:bg-[#c9f02e]"
             >
               Find a court <ArrowUpRight className="ml-1 inline" size={16} />
             </button>
-          </div>
 
-          {/* Mobile Hamburger Button */}
-          <button className="sm:hidden" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle menu">
-            {mobileMenu ? <X /> : <Menu />}
-          </button>
+            {/* Mobile Hamburger Button */}
+            <button className="md:hidden ml-1 p-1 text-black" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle menu">
+              {mobileMenu ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
         </div>
 
         {/* Mobile Menu Dropdown */}
@@ -277,24 +277,13 @@ export default function Home() {
             <div className="border-t border-black/10 pt-3">
               {user ? (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2.5 px-1 py-1">
-                    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#101310] text-xs font-black text-[#d8ff3e]">
-                      {(user.user_metadata?.full_name || user.email || 'U')[0].toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-bold text-black">
-                        {user.user_metadata?.full_name || 'Account'}
-                      </p>
-                      <p className="truncate text-[10px] text-black/50">{user.email}</p>
-                    </div>
-                  </div>
                   <button
                     onClick={() => {
                       setShowVenueAdmin(false);
                       setShowUserBookings(true);
                       setMobileMenu(false);
                     }}
-                    className="w-full rounded-xl bg-[#f7f8f4] py-2 text-center text-xs font-bold text-black"
+                    className="w-full rounded-xl bg-[#f7f8f4] py-2.5 text-center text-xs font-bold text-black"
                   >
                     📋 My Bookings
                   </button>
@@ -303,7 +292,7 @@ export default function Home() {
                       handleVenueAdminAccess();
                       setMobileMenu(false);
                     }}
-                    className="w-full rounded-xl bg-[#eef7cf] py-2 text-center text-xs font-bold text-[#5e7310]"
+                    className="w-full rounded-xl bg-[#eef7cf] py-2.5 text-center text-xs font-bold text-[#5e7310]"
                   >
                     🏟️ Venue Control Centre
                   </button>
@@ -312,7 +301,7 @@ export default function Home() {
                       supabase.auth.signOut();
                       setMobileMenu(false);
                     }}
-                    className="w-full rounded-xl border border-red-200 bg-red-50 py-2 text-center text-xs font-bold text-red-600"
+                    className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-center text-xs font-bold text-red-600"
                   >
                     Sign Out
                   </button>
@@ -517,12 +506,12 @@ function AccountDropdown({
     <div className="relative">
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-full border border-black/15 bg-white px-3 py-1.5 text-xs font-bold text-black transition hover:bg-black/5"
+        className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-black/15 bg-white px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-black transition hover:bg-black/5"
       >
         <span className="grid h-6 w-6 place-items-center rounded-full bg-[#101310] text-[11px] font-black text-[#d8ff3e]">
           {initial}
         </span>
-        <span className="max-w-[100px] truncate">{displayName}</span>
+        <span className="max-w-[70px] sm:max-w-[100px] truncate">{displayName}</span>
         <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
