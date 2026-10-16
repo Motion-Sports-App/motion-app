@@ -225,7 +225,7 @@ export default function Home() {
                 onClick={() => setShowAuthModal(true)}
                 className="rounded-full bg-[#101310] px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-white transition hover:bg-[#30372a]"
               >
-                Sign In
+                Sign In / Sign Up
               </button>
             )}
 
@@ -349,7 +349,7 @@ export default function Home() {
             </div>
             <div className="relative min-h-[390px] sm:min-h-[510px]">
               <div className="absolute right-0 top-0 h-[88%] w-[94%] overflow-hidden rounded-[2rem] bg-[#d8ff3e]"><div className="absolute inset-0 bg-gradient-to-br from-black/0 via-black/0 to-black/30"/><img src={DEFAULT_IMG} alt="Indoor badminton court" className="h-full w-full object-cover"/><div className="absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent"/><div className="absolute left-5 top-5 rounded-full bg-[#d8ff3e] px-4 py-2 text-[10px] font-black tracking-[.15em]">PLAY MORE. PLAN LESS.</div><div className="absolute bottom-6 left-6 text-white"><p className="text-xs font-bold uppercase tracking-[.18em] text-white/70">MAKE TIME FOR PLAY</p><p className="mt-1 text-3xl font-black tracking-tight sm:text-4xl">Game on.</p></div></div>
-              <div className="absolute -bottom-1 left-0 max-w-[235px] rounded-2xl bg-white p-4 shadow-soft sm:bottom-0 sm:left-[-15px]"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#eaf5bd] text-xl">🏸</div><div><p className="text-sm font-extrabold">Smash Arena</p><p className="mt-1 text-xs text-black/50">Phaya Thai, Bangkok</p></div><span className="ml-auto text-xs font-extrabold">฿220<span className="font-medium text-black/40">/hr</span></span></div><div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-black/50"><Star size={12} fill="#d6a927" stroke="#d6a927"/> 4.9 <span className="mx-1">·</span><span className="rounded-full bg-[#f0f5df] px-2 py-1 text-[#586c12]">AVAILABLE TODAY</span></div></div>
+              <div className="absolute -bottom-1 left-0 max-w-[235px] rounded-2xl bg-white p-4 shadow-soft sm:bottom-0 sm:left-[-15px]"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[#eaf5bd] text-xl">🏸</div><div><p className="text-sm font-extrabold">Smash Arena</p><p className="mt-1 text-xs text-black/50">Phaya Thai, Bangkok</p></div><span className="ml-auto text-xs font-extrabold">฿180<span className="font-medium text-black/40">/hr</span></span></div><div className="mt-3 flex items-center gap-1 text-[10px] font-bold text-black/50"><Star size={12} fill="#d6a927" stroke="#d6a927"/> 4.9 <span className="mx-1">·</span><span className="rounded-full bg-[#f0f5df] px-2 py-1 text-[#586c12]">AVAILABLE TODAY</span></div></div>
               <div className="absolute right-0 top-[44%] grid h-16 w-16 rotate-6 place-items-center rounded-2xl bg-[#d8ff3e] text-[#101310] shadow-lg sm:right-[-5px] sm:h-20 sm:w-20"><Zap size={31} fill="currentColor"/></div>
             </div>
           </section>
@@ -359,7 +359,7 @@ export default function Home() {
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end"><div><p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">YOUR NEXT SESSION</p><h2 className="mt-3 text-4xl font-black tracking-[-.06em] sm:text-5xl">Find your playing field.</h2><p className="mt-3 text-sm text-black/55 sm:text-base">Good courts. Clear prices. Less back-and-forth.</p></div><div className="text-sm font-semibold text-black/50">{filtered.length} courts to explore <ArrowRight className="ml-1 inline" size={16}/></div></div>
               <div className="mt-8 grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f4] p-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:p-4">
                 <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3"><Search size={18} className="shrink-0 text-black/40"/><span className="sr-only">Search courts</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Sport, venue or facility..." className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-black/40"/></label>
-                <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3"><MapPin size={18} className="shrink-0 text-black/40"/><span className="sr-only">Area</span><select value={area} onChange={e => setArea(e.target.value)} className="w-full bg-transparent text-sm outline-none"><option>Anywhere in Bangkok</option><option>Phaya Thai</option><option>Sukhumvit</option><option>Chatuchak</option><option>Rama 9</option><option>Bang Na</option><option>Thong Lo</option></select></label>
+                <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3"><MapPin size={18} className="shrink-0 text-black/40"/><span className="sr-only">Area</span><select value={area} onChange={e => setArea(e.target.value)} className="w-full bg-transparent text-sm outline-none"><option>Anywhere in Bangkok</option><option>Phaya Thai</option><option>Sukhumvit</option><option>Chatuchak</option><option>Rama 9</option><option>Bang Na</option><option>Thong Lo</option><option>Salaya</option></select></label>
                 <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3"><span className="text-sm font-bold text-black/45">฿</span><span className="sr-only">Maximum hourly price</span><select value={maxPrice} onChange={e => setMaxPrice(e.target.value)} className="w-full bg-transparent text-sm outline-none"><option>Any price</option><option value="250">Up to ฿250 / hr</option><option value="500">Up to ฿500 / hr</option><option value="1000">Up to ฿1,000 / hr</option></select></label>
                 <button onClick={() => setShowFilters(!showFilters)} className="flex items-center justify-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-3 text-sm font-extrabold transition hover:bg-[#c9f02e]"><SlidersHorizontal size={17}/> Filters <ChevronDown size={15}/></button>
               </div>
@@ -423,8 +423,16 @@ export default function Home() {
 
       {/* CONFIRMATION POPUP */}
       {confirmed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true">
-          <div className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9">
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" 
+          role="dialog" 
+          aria-modal="true"
+          onClick={() => setConfirmed(null)}
+        >
+          <div 
+            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
               <Check size={30} strokeWidth={3} />
             </div>
@@ -695,6 +703,23 @@ function VenueModal({
 
   const totalCourts = venue.total_courts || 4;
 
+  // Search query generation for Google Maps based on venue address or name
+  const mapSearchQuery = encodeURIComponent(
+    venue.address || `${venue.name}, ${venue.area || 'Bangkok'}`
+  );
+  
+  const googleMapsUrl = venue.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${mapSearchQuery}`;
+  const embedMapUrl = `https://maps.google.com/maps?q=${mapSearchQuery}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   useEffect(() => {
     if (user) {
       setCustomerEmail(user.email || '');
@@ -865,14 +890,26 @@ function VenueModal({
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/55 p-0 sm:items-center sm:p-4">
-      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl">
+    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
+      {/* Tap / Click Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/60 transition-opacity" 
+        onClick={onClose}
+        onTouchEnd={onClose}
+      />
+
+      {/* Modal Container */}
+      <div 
+        className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+      >
         <div className="relative h-48 sm:h-56">
           <img src={venue.image || DEFAULT_IMG} alt={venue.name} className="h-full w-full object-cover" />
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white text-black hover:bg-gray-100"
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-black hover:bg-white shadow-md"
           >
             <X size={19} />
           </button>
@@ -897,6 +934,53 @@ function VenueModal({
             <p className="mt-4 text-xs leading-5 text-black/60">
               {venue.description || 'No description provided.'}
             </p>
+
+            {/* Mobile Google Maps Link Button */}
+            <div className="mt-3 block sm:hidden">
+              <a
+                href={googleMapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-[#f7f8f4] px-3.5 py-2 text-xs font-bold text-black hover:bg-gray-200 transition"
+              >
+                <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"
+                  />
+                </svg>
+                Open in Google Maps ↗
+              </a>
+            </div>
+
+            {/* PC Embedded Google Maps View */}
+            <div className="mt-5 hidden sm:block">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-xs font-extrabold text-black uppercase">Location</h3>
+                <a
+                  href={googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] font-extrabold text-[#758e1b] hover:underline"
+                >
+                  View larger map ↗
+                </a>
+              </div>
+              {venue.address && (
+                <p className="mb-2 text-xs text-black/60">{venue.address}</p>
+              )}
+              <div className="h-36 w-full overflow-hidden rounded-xl border border-black/10 bg-gray-100">
+                <iframe
+                  title="Venue Location Map"
+                  width="100%"
+                  height="100%"
+                  className="border-0"
+                  loading="lazy"
+                  allowFullScreen
+                  src={embedMapUrl}
+                />
+              </div>
+            </div>
 
             <h3 className="mt-5 text-xs font-extrabold text-black uppercase">Facilities</h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -1024,7 +1108,7 @@ function VenueModal({
                   <input
                     type="text"
                     required
-                    placeholder="Full Name *"
+                    placeholder="Name *"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:border-black/40"
@@ -1032,7 +1116,7 @@ function VenueModal({
                   <input
                     type="text"
                     required
-                    placeholder="Phone Number *"
+                    placeholder="Email *"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
                     className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:border-black/40"

@@ -17,6 +17,8 @@ export type Venue = {
   tag?: string;
   reviews?: number;
   description?: string;
+  address?: string;
+  google_maps_url?: string;
 };
 
 export type Coach = {
