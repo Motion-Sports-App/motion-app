@@ -956,7 +956,7 @@ function VenueModal({
             {/* PC Embedded Google Maps View */}
             <div className="mt-5 hidden sm:block">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-extrabold text-black uppercase">Location</h3>
+                <h3 className="text-xs font-extrabold text-black uppercase">Address</h3>
                 <a
                   href={googleMapsUrl}
                   target="_blank"
