@@ -225,7 +225,7 @@ export default function Home() {
                 onClick={() => setShowAuthModal(true)}
                 className="rounded-full bg-[#101310] px-3.5 py-1.5 sm:px-5 sm:py-2.5 text-xs font-bold text-white transition hover:bg-[#30372a]"
               >
-                meow meow
+                Sign in / Sign up
               </button>
             )}
 
