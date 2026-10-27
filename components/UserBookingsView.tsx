@@ -6,16 +6,20 @@ import type { Booking } from '@/lib/services/bookingService';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 
+// Helper to determine if a booking date + time slot has already passed
 function isBookingPast(dateStr: string, timeStr: string): boolean {
   try {
     const now = new Date();
 
-    // Extract end time from format "14:00 - 15:00" or "14:00 – 16:00 (2 hrs)"
+    // Find the last slot end time (e.g. from "11:00 - 12:00, 12:00 - 13:00", get "13:00")
     let endTimeStr = '23:59';
-    if (timeStr.includes('-')) {
-      endTimeStr = timeStr.split('-')[1].trim().split(' ')[0];
-    } else if (timeStr.includes('–')) {
-      endTimeStr = timeStr.split('–')[1].trim().split(' ')[0];
+    const parts = timeStr.split(',');
+    const lastPart = parts[parts.length - 1].trim();
+
+    if (lastPart.includes('-')) {
+      endTimeStr = lastPart.split('-')[1].trim().split(' ')[0];
+    } else if (lastPart.includes('–')) {
+      endTimeStr = lastPart.split('–')[1].trim().split(' ')[0];
     }
 
     const [hours, minutes] = endTimeStr.split(':').map(Number);
@@ -41,7 +45,6 @@ export default function UserBookingsView({
 }) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
-  // Categorize bookings based on status and time
   const { upcomingBookings, pastBookings, totalPoints } = useMemo(() => {
     const upcoming: Booking[] = [];
     const past: Booking[] = [];
@@ -79,7 +82,7 @@ export default function UserBookingsView({
         <div>
           <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">PLAYER ACCOUNT</p>
           <h1 className="mt-1 text-4xl font-black tracking-[-.06em]">My Bookings</h1>
-          <p className="mt-1 text-sm text-black/55">Manage your upcoming games and view your activity history.</p>
+          <p className="mt-1 text-sm text-black/55">Manage your active reservations and game history.</p>
         </div>
         {user && (
           <span className="self-start sm:self-auto rounded-full bg-[#eef7cf] px-4 py-2 text-xs font-black text-[#586c12] border border-[#d2e896]">
@@ -156,7 +159,6 @@ export default function UserBookingsView({
                     </span>
                     <b className="text-sm">{money(b.price)}</b>
 
-                    {/* Show Cancel button ONLY for upcoming active bookings */}
                     {b.status === 'Confirmed' && !isPast && (
                       <button
                         onClick={() => onCancel(b.id)}
