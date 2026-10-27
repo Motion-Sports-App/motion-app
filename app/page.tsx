@@ -102,14 +102,17 @@ export default function Home() {
   }, [venues, activeSport, query, area, maxPrice]);
 
   const handleVenueAdminAccess = () => {
-    const isApprovedVenue =
-      user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
-    if (isApprovedVenue) {
+  const isApprovedVenue =
+    user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
+  const isApprovedCoach =
+    user?.user_metadata?.role === 'coach' || user?.user_metadata?.is_approved_coach === true;
+
+    if (isApprovedVenue || isApprovedCoach) {
       setShowUserBookings(false);
       setShowVenueAdmin(true);
     } else {
       alert(
-        'Access restricted: Your account is not an approved venue account. Please apply to list your venue on Motion.'
+        'Access restricted: Your account is not registered as a venue owner or coach. Please apply to partner with Motion.'
       );
     }
   };
@@ -140,6 +143,7 @@ export default function Home() {
         />
       ) : showVenueAdmin ? (
         <Dashboard
+          user={user}
           bookings={bookings}
           venues={venues}
           onBack={() => setShowVenueAdmin(false)}
