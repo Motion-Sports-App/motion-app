@@ -102,7 +102,7 @@ export default function Home() {
     });
   }, [venues, activeSport, query, area, maxPrice]);
 
-  // Add state
+  // Add state for Partner Onboarding view
   const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
 
   const handleVenueAdminAccess = () => {
@@ -123,6 +123,16 @@ export default function Home() {
     }
   };
 
+  //Motion Admin Center Access
+  const [showMotionAdmin, setShowMotionAdmin] = useState(false);
+
+  const handleMotionAdminOpen = () => {
+    setShowUserBookings(false);
+    setShowVenueAdmin(false);
+    setShowPartnerOnboarding(false);
+    setShowMotionAdmin(true);
+  };
+
 
   return (
     <main className="min-h-screen overflow-hidden">
@@ -135,9 +145,11 @@ export default function Home() {
         onNavigate={handleNavigate}
         onBookingsOpen={() => {
           setShowVenueAdmin(false);
+          setShowMotionAdmin(false);
           setShowUserBookings(true);
         }}
         onVenueAdminOpen={handleVenueAdminAccess}
+        onMotionAdminOpen={handleMotionAdminOpen}
         onAuthModalOpen={() => setShowAuthModal(true)}
       />
 

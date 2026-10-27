@@ -7,10 +7,12 @@ import { supabase } from '@/lib/supabase';
 export default function AccountDropdown({
   user,
   onBookingsOpen,
+  onMotionAdminOpen,
   onVenueAdminOpen,
 }: {
   user: any;
   onBookingsOpen: () => void;
+  onMotionAdminOpen: () => void;
   onVenueAdminOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -19,6 +21,11 @@ export default function AccountDropdown({
   const initial = displayName[0].toUpperCase();
   const isApprovedVenue =
     user.user_metadata?.role === 'venue_owner' || user.user_metadata?.is_approved_venue === true;
+
+  const isMotionAdmin = user?.email && [
+    'mingtan0403@gmail.com', // Update with your actual emails
+    'motionsportsapp@gmail.com'
+  ].includes(user.email.toLowerCase());
 
   return (
     <div className="relative">
@@ -52,6 +59,18 @@ export default function AccountDropdown({
               >
                 📋 My Bookings
               </button>
+
+                {isMotionAdmin && (
+                  <button
+                    onClick={() => {
+                      onMotionAdminOpen();
+                      setOpen(false);
+                    }}
+                    className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-purple-700 bg-purple-50 hover:bg-purple-100"
+                  >
+                    🛡️ Motion Approval Center
+                  </button>
+                )}
 
               {isApprovedVenue ? (
                 <button

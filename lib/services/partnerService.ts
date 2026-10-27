@@ -100,4 +100,43 @@ export const partnerService = {
 
     return !error;
   },
+
+    // Add these methods inside partnerService object:
+
+    // Fetch pending applications for Motion Team
+    async getPendingVenueApplications() {
+    const { data, error } = await supabase
+        .from('venue_applications')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+    if (error) {
+        console.error('Error fetching venue applications:', error);
+        return [];
+    }
+    return data || [];
+    },
+
+    // Motion Admin approves application & inserts into live venues table
+    async approveVenueApplication(applicationId: string) {
+    const { data, error } = await supabase.rpc('approve_venue_application', {
+        p_application_id: applicationId,
+    });
+
+    if (error) {
+        console.error('Approval Error:', error);
+        return { success: false, error: error.message };
+    }
+    return { success: true, data };
+    },
+
+    // Motion Admin rejects application
+    async rejectVenueApplication(applicationId: string) {
+    const { error } = await supabase
+        .from('venue_applications')
+        .update({ status: 'rejected' })
+        .eq('id', applicationId);
+
+    return !error;
+    },
 };

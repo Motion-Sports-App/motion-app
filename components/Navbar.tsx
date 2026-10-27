@@ -10,12 +10,14 @@ export default function Navbar({
   onNavigate,
   onBookingsOpen,
   onVenueAdminOpen,
+  onMotionAdminOpen,
   onAuthModalOpen,
 }: {
   user: any;
   onNavigate: (targetId?: string) => void;
   onBookingsOpen: () => void;
   onVenueAdminOpen: () => void;
+  onMotionAdminOpen: () => void;
   onAuthModalOpen: () => void;
 }) {
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -54,6 +56,7 @@ export default function Navbar({
               user={user}
               onBookingsOpen={onBookingsOpen}
               onVenueAdminOpen={onVenueAdminOpen}
+              onMotionAdminOpen={onMotionAdminOpen}
             />
           ) : (
             <button
