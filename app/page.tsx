@@ -25,6 +25,7 @@ import VenueCard from '@/components/VenueCard';
 import VenueModal from '@/components/VenueModal';
 import UserBookingsView from '@/components/UserBookingsView';
 import Dashboard from '@/components/Dashboard';
+import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
@@ -101,21 +102,27 @@ export default function Home() {
     });
   }, [venues, activeSport, query, area, maxPrice]);
 
+  // Add state
+  const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
+
   const handleVenueAdminAccess = () => {
-  const isApprovedVenue =
-    user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
-  const isApprovedCoach =
-    user?.user_metadata?.role === 'coach' || user?.user_metadata?.is_approved_coach === true;
+    const isApprovedVenue =
+      user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
+    const isApprovedCoach =
+      user?.user_metadata?.role === 'coach' || user?.user_metadata?.is_approved_coach === true;
 
     if (isApprovedVenue || isApprovedCoach) {
       setShowUserBookings(false);
+      setShowPartnerOnboarding(false);
       setShowVenueAdmin(true);
     } else {
-      alert(
-        'Access restricted: Your account is not registered as a venue owner or coach. Please apply to partner with Motion.'
-      );
+      // Navigate smoothly to Partner Onboarding page (No popups!)
+      setShowUserBookings(false);
+      setShowVenueAdmin(false);
+      setShowPartnerOnboarding(true);
     }
   };
+
 
   return (
     <main className="min-h-screen overflow-hidden">
@@ -134,7 +141,14 @@ export default function Home() {
         onAuthModalOpen={() => setShowAuthModal(true)}
       />
 
-      {showUserBookings ? (
+      {showPartnerOnboarding ? (
+        <PartnerOnboardingView
+          user={user}
+          venues={venues}
+          onBack={() => setShowPartnerOnboarding(false)}
+          onAuthModalOpen={() => setShowAuthModal(true)}
+        />
+      ) : showUserBookings ? (
         <UserBookingsView
           user={user}
           bookings={bookings}
