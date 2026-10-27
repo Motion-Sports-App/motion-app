@@ -9,7 +9,7 @@ export type Venue = {
   slots: string[];
   price: number;
   price_per_hour?: number;
-  total_courts?: number; // <--- Add this property
+  total_courts?: number;
   rating?: number;
   image?: string;
   image_url?: string;
@@ -23,6 +23,7 @@ export type Venue = {
 
 export type Coach = {
   id: string;
+  user_id?: string;
   full_name: string;
   sport: string;
   hourly_rate: number;

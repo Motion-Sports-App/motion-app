@@ -3,31 +3,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Star, X } from 'lucide-react';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
-// import { ALL_BOOKING_SLOTS, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
+import { ALL_BOOKING_SLOTS, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
 import type { Venue } from '@/lib/data';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
 const dateLabel = (d: Date) => d.toLocaleDateString('en-CA');
-
-const DEFAULT_VENUE_IMAGE =
-  'https://images.unsplash.com/photo-1626224583764-f87db24ac4ea?auto=format&fit=crop&w=800&q=80';
-
-const ALL_BOOKING_SLOTS = [
-  '09:00 - 10:00',
-  '10:00 - 11:00',
-  '11:00 - 12:00',
-  '12:00 - 13:00',
-  '13:00 - 14:00',
-  '14:00 - 15:00',
-  '15:00 - 16:00',
-  '16:00 - 17:00',
-  '17:00 - 18:00',
-  '18:00 - 19:00',
-  '19:00 - 20:00',
-  '20:00 - 21:00',
-  '21:00 - 22:00',
-];
 
 export default function VenueModal({
   venue,
@@ -167,7 +148,6 @@ export default function VenueModal({
 
     const finalCustomerEmail = user ? user.email || '' : customerEmail;
 
-    // Call atomic RPC function in Supabase
     const result = await bookingService.createViaRPC({
       venueId: venue.id,
       venueName: venue.name,
