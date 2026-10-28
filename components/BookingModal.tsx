@@ -11,6 +11,7 @@ interface BookingDetails {
   itemType: string;
   itemName: string;
   venueName?: string;
+  venueId?: string;
   sport?: string;
   price: number;
   date: string;
@@ -22,7 +23,7 @@ export default function BookingModal({
   onClose,
 }: {
   bookingDetails: BookingDetails;
-  onClose?: () => void; // 👈 Made optional to prevent runtime crashes
+  onClose?: () => void;
 }) {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<{ full_name: string; phone: string; points: number } | null>(null);
@@ -40,6 +41,11 @@ export default function BookingModal({
 
   const bookingPrice = bookingDetails?.price || 180;
   const pointsToEarn = Math.floor(bookingPrice / 10);
+
+  // Normalize date string to YYYY-MM-DD
+  const formattedDate = bookingDetails?.date
+    ? (bookingDetails.date.includes('T') ? bookingDetails.date.split('T')[0] : bookingDetails.date)
+    : new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     async function loadUserData() {
@@ -59,7 +65,6 @@ export default function BookingModal({
     loadUserData();
   }, []);
 
-  // Centralized close handler with defensive fallback check
   const handleClose = () => {
     setIsSuccess(false);
     if (typeof onClose === 'function') {
@@ -76,11 +81,13 @@ export default function BookingModal({
     const bookingPayload = {
       user_id: user ? user.id : null,
       booking_code: bookingCode,
+      venue_id: bookingDetails.venueId || null,
       venue_name: bookingDetails.venueName || bookingDetails.itemName || 'Motion Arena',
       sport: bookingDetails.sport || 'Badminton',
       item_type: bookingDetails.itemType || 'court',
       item_name: bookingDetails.itemName || 'Badminton Court 1',
-      booking_date: bookingDetails.date,
+      booking_date: formattedDate,
+      date: formattedDate, // Dual payload coverage for date column variations
       booking_time: bookingDetails.timeSlot,
       time_slot: bookingDetails.timeSlot,
       price: bookingPrice,
@@ -131,8 +138,6 @@ export default function BookingModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
       <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl transition-all">
-        
-        {/* SUCCESS / THANK YOU VIEW */}
         {isSuccess ? (
           <div className="text-center py-4 space-y-4">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#d8ff3e]">
@@ -155,7 +160,7 @@ export default function BookingModal({
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Date & Time:</span>
-                <span className="font-bold text-black">{bookingDetails.date} @ {bookingDetails.timeSlot}</span>
+                <span className="font-bold text-black">{formattedDate} @ {bookingDetails.timeSlot}</span>
               </div>
               {user && (
                 <div className="flex justify-between text-[#22c55e] font-bold pt-1">
@@ -174,7 +179,6 @@ export default function BookingModal({
             </button>
           </div>
         ) : (
-          /* CONFIRMATION FORM VIEW */
           <>
             <div className="flex items-start justify-between border-b border-gray-100 pb-4">
               <div>
@@ -183,7 +187,6 @@ export default function BookingModal({
                   {bookingDetails.itemName} — {formatTHB(bookingPrice)}
                 </p>
               </div>
-              {/* FIXED X BUTTON */}
               <button
                 type="button"
                 onClick={handleClose}
@@ -196,7 +199,7 @@ export default function BookingModal({
             <div className="my-4 rounded-2xl bg-gray-50 p-3.5 text-xs text-gray-700 space-y-1">
               <div className="flex justify-between">
                 <span className="text-gray-500">Date:</span>
-                <span className="font-bold text-black">{bookingDetails.date}</span>
+                <span className="font-bold text-black">{formattedDate}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Time Slot:</span>
