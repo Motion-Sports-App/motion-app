@@ -8,7 +8,12 @@ import type { Venue } from '@/lib/data';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
-const dateLabel = (d: Date) => d.toLocaleDateString('en-CA');
+const dateLabel = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function VenueModal({
   venue,

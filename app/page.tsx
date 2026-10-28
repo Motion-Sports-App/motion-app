@@ -30,7 +30,12 @@ import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 // Inside app/page.tsx
 const today = new Date();
-const dateLabel = (d: Date) => d.toISOString().split('T')[0]; // Guarantees YYYY-MM-DD format
+const dateLabel = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState<any>(null);
