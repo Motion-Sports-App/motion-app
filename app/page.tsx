@@ -28,9 +28,9 @@ import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
+// Inside app/page.tsx
 const today = new Date();
-const dateLabel = (d: Date) => d.toLocaleDateString('en-CA');
-
+const dateLabel = (d: Date) => d.toISOString().split('T')[0]; // Guarantees YYYY-MM-DD format
 export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -327,18 +327,44 @@ export default function Home() {
       )}
 
       {confirmed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setConfirmed(null)}>
-          <div className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" 
+          onClick={() => setConfirmed(null)}
+        >
+          <div 
+            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
               <Check size={30} strokeWidth={3} />
             </div>
+
             <h2 className="mt-4 text-3xl font-black tracking-tight">You're in. Game on!</h2>
-            <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm">
-              <p className="font-extrabold">{confirmed.venue}</p>
-              <p className="text-xs text-black/50">{confirmed.date} · {confirmed.time}</p>
-              <p className="mt-2 font-black">{money(confirmed.price)}</p>
+
+            <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-extrabold text-black">{confirmed.venue}</p>
+                  <p className="text-xs text-black/50 mt-0.5">{confirmed.date} · {confirmed.time}</p>
+                </div>
+                <p className="font-black text-black">{money(confirmed.price)}</p>
+              </div>
+
+              {/* ⚡ POINTS / CREDITS DISPLAY */}
+              {(user || (confirmed.pointsEarned && confirmed.pointsEarned > 0)) && (
+                <div className="flex items-center justify-between border-t border-black/10 pt-2 text-xs font-bold text-[#5d7112]">
+                  <span>⚡ Points Earned:</span>
+                  <span className="rounded-full bg-[#d8ff3e] px-2.5 py-0.5 font-black text-black">
+                    +{confirmed.pointsEarned || Math.floor(confirmed.price / 10)} PTS
+                  </span>
+                </div>
+              )}
             </div>
-            <button onClick={() => setConfirmed(null)} className="mt-6 w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white">
+
+            <button 
+              onClick={() => setConfirmed(null)} 
+              className="mt-6 w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white transition hover:bg-[#30372a]"
+            >
               Done
             </button>
           </div>
