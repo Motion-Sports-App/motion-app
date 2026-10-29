@@ -19,13 +19,22 @@ export default function AccountDropdown({
 
   const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
   const initial = displayName[0].toUpperCase();
-  const isApprovedVenue =
-    user.user_metadata?.role === 'venue_owner' || user.user_metadata?.is_approved_venue === true;
 
-  const isMotionAdmin = user?.email && [
-    'mingtan0403@gmail.com', // Update with your actual emails
-    'motionsportsapp@gmail.com'
-  ].includes(user.email.toLowerCase());
+  // Check if account is a Super Admin
+  const isMotionAdmin =
+    user?.email &&
+    [
+      'mingtan0403@gmail.com',
+      'motionsportsapp@gmail.com',
+      'ming@motion.app',
+      'admin@motion.app',
+    ].includes(user.email.toLowerCase());
+
+  // Show Venue Control if user is approved venue owner OR super admin
+  const isApprovedVenue =
+    isMotionAdmin ||
+    user?.user_metadata?.role === 'venue_owner' ||
+    user?.user_metadata?.is_approved_venue === true;
 
   return (
     <div className="relative">
@@ -60,19 +69,20 @@ export default function AccountDropdown({
                 📋 My Bookings
               </button>
 
-                {isMotionAdmin && (
-                  <button
-                    onClick={() => {
-                      onMotionAdminOpen();
-                      setOpen(false);
-                    }}
-                    className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-purple-700 bg-purple-50 hover:bg-purple-100"
-                  >
-                    🛡️ Motion Approval Center
-                  </button>
-                )}
+              {isMotionAdmin && (
+                <button
+                  onClick={() => {
+                    onMotionAdminOpen();
+                    setOpen(false);
+                  }}
+                  className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-purple-700 bg-purple-50 hover:bg-purple-100"
+                >
+                  🛡️ Motion Approval Center
+                </button>
+              )}
 
-              {isApprovedVenue ? (
+              {/* ONLY SHOWN IF APPROVED OR SUPER ADMIN */}
+              {isApprovedVenue && (
                 <button
                   onClick={() => {
                     onVenueAdminOpen();
@@ -81,16 +91,6 @@ export default function AccountDropdown({
                   className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-[#5e7310] bg-[#eef7cf]/60 hover:bg-[#eef7cf]"
                 >
                   🏟️ Venue Control Centre
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    onVenueAdminOpen();
-                    setOpen(false);
-                  }}
-                  className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-black/40 hover:bg-gray-50"
-                >
-                  🔒 Venue Control (Request Access)
                 </button>
               )}
             </div>

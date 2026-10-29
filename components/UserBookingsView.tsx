@@ -91,7 +91,7 @@ export default function UserBookingsView({
         </div>
         {user && (
           <span className="self-start sm:self-auto rounded-full bg-[#eef7cf] px-4 py-2 text-xs font-black text-[#586c12] border border-[#d2e896]">
-            ⚡ Points Earned: {totalPoints} PTS
+            ⚡ Points: {totalPoints} PTS
           </span>
         )}
       </div>
@@ -122,7 +122,7 @@ export default function UserBookingsView({
           }`}
         >
           <History size={15} />
-          Past & Cancelled ({pastBookings.length})
+          Past & Cancelled
         </button>
       </div>
 
@@ -189,7 +189,7 @@ export default function UserBookingsView({
                   onClick={() => setPastLimit((prev) => prev + 5)}
                   className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-5 py-2 text-xs font-bold text-black transition hover:bg-black/5"
                 >
-                  Load More ({pastBookings.length - pastLimit} remaining) <ChevronDown size={14} />
+                  Load More <ChevronDown size={14} />
                 </button>
               </div>
             )}

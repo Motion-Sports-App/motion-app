@@ -111,17 +111,21 @@ export default function Home() {
   const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
 
   const handleVenueAdminAccess = () => {
-    const isApprovedVenue =
-      user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
-    const isApprovedCoach =
-      user?.user_metadata?.role === 'coach' || user?.user_metadata?.is_approved_coach === true;
+    const isSuperAdmin = user?.email && [
+      'mingtan0403@gmail.com',
+      'motionsportsapp@gmail.com'
+    ].includes(user.email.toLowerCase());
 
-    if (isApprovedVenue || isApprovedCoach) {
+    const isApprovedVenue =
+      isSuperAdmin ||
+      user?.user_metadata?.role === 'venue_owner' || 
+      user?.user_metadata?.is_approved_venue === true;
+
+    if (isApprovedVenue) {
       setShowUserBookings(false);
       setShowPartnerOnboarding(false);
       setShowVenueAdmin(true);
     } else {
-      // Navigate smoothly to Partner Onboarding page (No popups!)
       setShowUserBookings(false);
       setShowVenueAdmin(false);
       setShowPartnerOnboarding(true);
