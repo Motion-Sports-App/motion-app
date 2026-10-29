@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Menu, X, Zap } from 'lucide-react';
 import AccountDropdown from '@/components/AccountDropdown';
-import { supabase } from '@/lib/supabase';
 
 export default function Navbar({
   user,
@@ -87,7 +86,7 @@ export default function Navbar({
       {mobileMenu && (
         <div className="border-t border-black/10 px-5 py-4 md:hidden bg-white shadow-lg space-y-3">
           <button
-            className="block w-full text-left py-2 font-semibold text-sm"
+            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
             onClick={() => {
               onNavigate('explore');
               setMobileMenu(false);
@@ -96,7 +95,7 @@ export default function Navbar({
             Explore courts
           </button>
           <button
-            className="block w-full text-left py-2 font-semibold text-sm"
+            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
             onClick={() => {
               onNavigate('how-it-works');
               setMobileMenu(false);
@@ -105,7 +104,7 @@ export default function Navbar({
             How it works
           </button>
           <button
-            className="block w-full text-left py-2 font-semibold text-sm"
+            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
             onClick={() => {
               onVenueAdminOpen();
               setMobileMenu(false);
@@ -114,38 +113,9 @@ export default function Navbar({
             Partners & Venues ↗
           </button>
 
-          <div className="border-t border-black/10 pt-3">
-            {user ? (
-              <div className="space-y-2">
-                <button
-                  onClick={() => {
-                    onBookingsOpen();
-                    setMobileMenu(false);
-                  }}
-                  className="w-full rounded-xl bg-[#f7f8f4] py-2.5 text-center text-xs font-bold text-black"
-                >
-                  📋 My Bookings
-                </button>
-                <button
-                  onClick={() => {
-                    onVenueAdminOpen();
-                    setMobileMenu(false);
-                  }}
-                  className="w-full rounded-xl bg-[#eef7cf] py-2.5 text-center text-xs font-bold text-[#5e7310]"
-                >
-                  🏟️ Venue Control Centre
-                </button>
-                <button
-                  onClick={() => {
-                    supabase.auth.signOut();
-                    setMobileMenu(false);
-                  }}
-                  className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 text-center text-xs font-bold text-red-600"
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
+          {/* Shown ONLY when guest/logged-out */}
+          {!user && (
+            <div className="border-t border-black/10 pt-3">
               <button
                 onClick={() => {
                   onAuthModalOpen();
@@ -155,8 +125,8 @@ export default function Navbar({
               >
                 Sign In / Sign Up
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
     </header>
