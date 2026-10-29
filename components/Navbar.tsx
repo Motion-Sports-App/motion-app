@@ -111,7 +111,7 @@ export default function Navbar({
               setMobileMenu(false);
             }}
           >
-            For venues ↗
+            Partners & Venues ↗
           </button>
 
           <div className="border-t border-black/10 pt-3">
