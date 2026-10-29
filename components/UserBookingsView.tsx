@@ -1,17 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ArrowLeft, CalendarDays, CheckCircle2, History } from 'lucide-react';
+import { ArrowLeft, CalendarDays, CheckCircle2, History, ChevronDown } from 'lucide-react';
 import type { Booking } from '@/lib/services/bookingService';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 
-// Helper to determine if a booking date + time slot has already passed
 function isBookingPast(dateStr: string, timeStr: string): boolean {
   try {
     const now = new Date();
 
-    // Find the last slot end time (e.g. from "11:00 - 12:00, 12:00 - 13:00", get "13:00")
     let endTimeStr = '23:59';
     const parts = timeStr.split(',');
     const lastPart = parts[parts.length - 1].trim();
@@ -44,6 +42,9 @@ export default function UserBookingsView({
   onCancel: (id: string) => void;
 }) {
   const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  
+  // State to track visible past bookings (starts at 5)
+  const [pastLimit, setPastLimit] = useState(5);
 
   const { upcomingBookings, pastBookings, totalPoints } = useMemo(() => {
     const upcoming: Booking[] = [];
@@ -67,7 +68,11 @@ export default function UserBookingsView({
     return { upcomingBookings: upcoming, pastBookings: past, totalPoints: points };
   }, [bookings]);
 
-  const currentList = activeTab === 'upcoming' ? upcomingBookings : pastBookings;
+  // Slice list if in "past" tab according to current pastLimit
+  const displayedList =
+    activeTab === 'upcoming' ? upcomingBookings : pastBookings.slice(0, pastLimit);
+
+  const hasMorePast = activeTab === 'past' && pastLimit < pastBookings.length;
 
   return (
     <section className="mx-auto min-h-[75vh] max-w-4xl px-5 py-10 lg:px-8 lg:py-16">
@@ -106,7 +111,10 @@ export default function UserBookingsView({
         </button>
 
         <button
-          onClick={() => setActiveTab('past')}
+          onClick={() => {
+            setActiveTab('past');
+            setPastLimit(5); // Reset limit back to 5 when switching tabs
+          }}
           className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
             activeTab === 'past'
               ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
@@ -120,58 +128,72 @@ export default function UserBookingsView({
 
       {/* BOOKINGS LIST */}
       <div className="mt-6 overflow-hidden rounded-2xl border border-black/10 bg-white">
-        {currentList.length > 0 ? (
-          <div className="divide-y divide-black/5">
-            {currentList.map((b) => {
-              const isPast = isBookingPast(b.date, b.time);
-              const isCancelled = b.status === 'Cancelled';
+        {displayedList.length > 0 ? (
+          <>
+            <div className="divide-y divide-black/5">
+              {displayedList.map((b) => {
+                const isPast = isBookingPast(b.date, b.time);
+                const isCancelled = b.status === 'Cancelled';
 
-              return (
-                <div key={b.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
-                        {b.sport}
-                      </span>
-                      {isPast && !isCancelled && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-500">
-                          Completed
+                return (
+                  <div key={b.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
+                          {b.sport}
                         </span>
+                        {isPast && !isCancelled && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-500">
+                            Completed
+                          </span>
+                        )}
+                      </div>
+                      <p className="font-extrabold text-base text-black mt-0.5">{b.venue}</p>
+                      <p className="mt-1 text-xs text-black/50">
+                        {b.date} · {b.time} · Ref: <span className="font-mono">{b.id}</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-black ${
+                          isCancelled
+                            ? 'bg-red-100 text-red-600'
+                            : isPast
+                            ? 'bg-gray-100 text-gray-600'
+                            : 'bg-[#edf5d2] text-[#5d7112]'
+                        }`}
+                      >
+                        {isCancelled ? 'Cancelled' : isPast ? 'Completed' : 'Confirmed'}
+                      </span>
+                      <b className="text-sm">{money(b.price)}</b>
+
+                      {b.status === 'Confirmed' && !isPast && (
+                        <button
+                          onClick={() => onCancel(b.id)}
+                          className="text-xs font-bold text-red-600 underline ml-2 hover:text-red-800 transition"
+                        >
+                          Cancel
+                        </button>
                       )}
                     </div>
-                    <p className="font-extrabold text-base text-black mt-0.5">{b.venue}</p>
-                    <p className="mt-1 text-xs text-black/50">
-                      {b.date} · {b.time} · Ref: <span className="font-mono">{b.id}</span>
-                    </p>
                   </div>
+                );
+              })}
+            </div>
 
-                  <div className="flex items-center gap-3">
-                    <span
-                      className={`rounded-full px-3 py-1 text-[10px] font-black ${
-                        isCancelled
-                          ? 'bg-red-100 text-red-600'
-                          : isPast
-                          ? 'bg-gray-100 text-gray-600'
-                          : 'bg-[#edf5d2] text-[#5d7112]'
-                      }`}
-                    >
-                      {isCancelled ? 'Cancelled' : isPast ? 'Completed' : 'Confirmed'}
-                    </span>
-                    <b className="text-sm">{money(b.price)}</b>
-
-                    {b.status === 'Confirmed' && !isPast && (
-                      <button
-                        onClick={() => onCancel(b.id)}
-                        className="text-xs font-bold text-red-600 underline ml-2 hover:text-red-800 transition"
-                      >
-                        Cancel
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+            {/* LOAD MORE BUTTON */}
+            {hasMorePast && (
+              <div className="p-4 text-center border-t border-black/5 bg-[#f7f8f4]">
+                <button
+                  onClick={() => setPastLimit((prev) => prev + 5)}
+                  className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-5 py-2 text-xs font-bold text-black transition hover:bg-black/5"
+                >
+                  Load More ({pastBookings.length - pastLimit} remaining) <ChevronDown size={14} />
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <div className="p-12 text-center">
             <CalendarDays className="mx-auto text-black/25" size={32} />
