@@ -146,19 +146,22 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden">
-      <div className="bg-[#d8ff3e] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
-        Your next game starts here <span className="mx-2">✳</span> Meet you on the court
-      </div>
+    <main className="min-h-screen">
+      {/* STICKY HEADER WRAPPER */}
+      <div className="sticky top-0 z-40 bg-[#f7f8f4]">
+        <div className="bg-[#d8ff3e] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
+          Your next game starts here <span className="mx-2">✳</span> Meet you on the court
+        </div>
 
-      <Navbar
-        user={user}
-        onNavigate={handleNavigate}
-        onBookingsOpen={handleBookingsOpen}
-        onVenueAdminOpen={handleVenueAdminAccess}
-        onMotionAdminOpen={handleMotionAdminOpen}
-        onAuthModalOpen={() => setShowAuthModal(true)}
-      />
+        <Navbar
+          user={user}
+          onNavigate={handleNavigate}
+          onBookingsOpen={handleBookingsOpen}
+          onVenueAdminOpen={handleVenueAdminAccess}
+          onMotionAdminOpen={handleMotionAdminOpen}
+          onAuthModalOpen={() => setShowAuthModal(true)}
+        />
+      </div>
 
       {/* RENDER ACTIVE VIEW BASED ON TOGGLED STATE */}
       {showMotionAdmin ? (

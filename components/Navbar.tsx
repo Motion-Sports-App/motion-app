@@ -22,7 +22,7 @@ export default function Navbar({
   const [mobileMenu, setMobileMenu] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-black/5 bg-[#f7f8f4]">
+    <header className="relative z-30 border-b border-black/5 bg-[#f7f8f4]">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
         <button
           className="flex items-center gap-2"
@@ -86,51 +86,60 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* MOBILE OVERLAY (Absolute positioning so content isn't pushed down) */}
+      {/* MOBILE MENU & BACKDROP */}
       {mobileMenu && (
-        <div className="absolute top-full left-0 right-0 z-50 border-b border-black/10 bg-white px-5 py-4 md:hidden shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
-          <button
-            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
-            onClick={() => {
-              onNavigate('explore');
-              setMobileMenu(false);
-            }}
-          >
-            Explore courts
-          </button>
-          <button
-            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
-            onClick={() => {
-              onNavigate('how-it-works');
-              setMobileMenu(false);
-            }}
-          >
-            How it works
-          </button>
-          <button
-            className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
-            onClick={() => {
-              onVenueAdminOpen();
-              setMobileMenu(false);
-            }}
-          >
-            Partners & Venues ↗
-          </button>
+        <>
+          {/* Backdrop overlay: Clicking anywhere outside closes the menu */}
+          <div
+            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-xs md:hidden"
+            onClick={() => setMobileMenu(false)}
+          />
 
-          {!user && (
-            <div className="border-t border-black/10 pt-3">
-              <button
-                onClick={() => {
-                  onAuthModalOpen();
-                  setMobileMenu(false);
-                }}
-                className="w-full rounded-full bg-[#101310] py-2.5 text-center text-xs font-bold text-white"
-              >
-                Sign In / Sign Up
-              </button>
-            </div>
-          )}
-        </div>
+          {/* Floating Mobile Drawer */}
+          <div className="absolute top-full left-0 right-0 z-50 border-b border-black/10 bg-white px-5 py-4 md:hidden shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+            <button
+              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              onClick={() => {
+                onNavigate('explore');
+                setMobileMenu(false);
+              }}
+            >
+              Explore courts
+            </button>
+            <button
+              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              onClick={() => {
+                onNavigate('how-it-works');
+                setMobileMenu(false);
+              }}
+            >
+              How it works
+            </button>
+            <button
+              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              onClick={() => {
+                onVenueAdminOpen();
+                setMobileMenu(false);
+              }}
+            >
+              Partners & Venues ↗
+            </button>
+
+            {!user && (
+              <div className="border-t border-black/10 pt-3">
+                <button
+                  onClick={() => {
+                    onAuthModalOpen();
+                    setMobileMenu(false);
+                  }}
+                  className="w-full rounded-full bg-[#101310] py-2.5 text-center text-xs font-bold text-white"
+                >
+                  Sign In / Sign Up
+                </button>
+              </div>
+            )}
+          </div>
+        </>
       )}
     </header>
   );
