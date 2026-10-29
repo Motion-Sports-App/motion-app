@@ -86,19 +86,19 @@ export default function Navbar({
         </div>
       </div>
 
-      {/* MOBILE MENU & BACKDROP */}
+      {/* INVISIBLE CLICK-OUT BACKDROP & CLEAN FLOATING DRAWER */}
       {mobileMenu && (
         <>
-          {/* Backdrop overlay: Clicking anywhere outside closes the menu */}
+          {/* Completely transparent click catcher */}
           <div
-            className="fixed inset-0 z-40 bg-black/20 backdrop-blur-xs md:hidden"
+            className="fixed inset-0 z-40 bg-transparent md:hidden"
             onClick={() => setMobileMenu(false)}
           />
 
-          {/* Floating Mobile Drawer */}
-          <div className="absolute top-full left-0 right-0 z-50 border-b border-black/10 bg-white px-5 py-4 md:hidden shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200 space-y-3">
+          {/* Floating drawer matching site canvas background */}
+          <div className="absolute top-full left-0 right-0 z-50 border-b border-black/10 bg-[#f7f8f4] px-6 py-5 md:hidden shadow-xl animate-in fade-in slide-in-from-top-1 duration-150 space-y-3">
             <button
-              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              className="block w-full text-left py-2 text-sm font-bold text-black hover:opacity-60 transition"
               onClick={() => {
                 onNavigate('explore');
                 setMobileMenu(false);
@@ -107,7 +107,7 @@ export default function Navbar({
               Explore courts
             </button>
             <button
-              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              className="block w-full text-left py-2 text-sm font-bold text-black hover:opacity-60 transition"
               onClick={() => {
                 onNavigate('how-it-works');
                 setMobileMenu(false);
@@ -116,7 +116,7 @@ export default function Navbar({
               How it works
             </button>
             <button
-              className="block w-full text-left py-2 font-semibold text-sm hover:opacity-60 transition"
+              className="block w-full text-left py-2 text-sm font-bold text-black hover:opacity-60 transition"
               onClick={() => {
                 onVenueAdminOpen();
                 setMobileMenu(false);
@@ -132,7 +132,7 @@ export default function Navbar({
                     onAuthModalOpen();
                     setMobileMenu(false);
                   }}
-                  className="w-full rounded-full bg-[#101310] py-2.5 text-center text-xs font-bold text-white"
+                  className="w-full rounded-full bg-[#101310] py-3 text-center text-xs font-extrabold text-white"
                 >
                   Sign In / Sign Up
                 </button>
