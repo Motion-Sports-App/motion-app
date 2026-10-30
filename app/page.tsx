@@ -346,12 +346,20 @@ export default function Home() {
       )}
 
       {confirmed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setConfirmed(null)}>
-          <div className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" 
+          onClick={() => setConfirmed(null)}
+        >
+          <div 
+            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
               <Check size={30} strokeWidth={3} />
             </div>
+
             <h2 className="mt-4 text-3xl font-black tracking-tight">You're in. Game on!</h2>
+
             <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm space-y-2">
               <div className="flex justify-between items-start">
                 <div>
@@ -360,6 +368,7 @@ export default function Home() {
                 </div>
                 <p className="font-black text-black">{money(confirmed.price)}</p>
               </div>
+
               {(user || (confirmed.pointsEarned && confirmed.pointsEarned > 0)) && (
                 <div className="flex items-center justify-between border-t border-black/10 pt-2 text-xs font-bold text-[#5d7112]">
                   <span>⚡ Points Earned:</span>
@@ -369,9 +378,26 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <button onClick={() => setConfirmed(null)} className="mt-6 w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white">
-              Done
-            </button>
+
+            {/* ACTION BUTTONS */}
+            <div className="mt-6 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setConfirmed(null);
+                  handleBookingsOpen();
+                }} 
+                className="w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white transition hover:bg-[#30372a]"
+              >
+                View my bookings
+              </button>
+
+              <button 
+                onClick={() => setConfirmed(null)} 
+                className="w-full rounded-full border border-black/10 bg-transparent py-2.5 text-xs font-bold text-black/60 transition hover:bg-black/5 hover:text-black"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}
