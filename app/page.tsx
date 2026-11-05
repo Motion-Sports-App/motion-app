@@ -4,14 +4,13 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowRight,
-  ArrowUpRight,
-  Check,
   ChevronDown,
   MapPin,
   Search,
   SlidersHorizontal,
   Sparkles,
   Zap,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { venueService } from '@/lib/services/venueService';
@@ -26,10 +25,16 @@ import VenueModal from '@/components/VenueModal';
 import UserBookingsView from '@/components/UserBookingsView';
 import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
+import MotionAdminCenter from '@/components/MotionAdminCenter'; // 👈 Imported
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
-const dateLabel = (d: Date) => d.toLocaleDateString('en-CA');
+const dateLabel = (d: Date) => {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -45,13 +50,23 @@ export default function Home() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
 
+  // View States
   const [showUserBookings, setShowUserBookings] = useState(false);
   const [showVenueAdmin, setShowVenueAdmin] = useState(false);
+  const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
+  const [showMotionAdmin, setShowMotionAdmin] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  const handleNavigate = (targetId?: string) => {
+  // Helper to reset all view flags when changing views
+  const resetViews = () => {
     setShowUserBookings(false);
     setShowVenueAdmin(false);
+    setShowPartnerOnboarding(false);
+    setShowMotionAdmin(false);
+  };
+
+  const handleNavigate = (targetId?: string) => {
+    resetViews();
     if (targetId) {
       setTimeout(() => {
         document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
@@ -102,69 +117,73 @@ export default function Home() {
     });
   }, [venues, activeSport, query, area, maxPrice]);
 
-  // Add state for Partner Onboarding view
-  const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
-
   const handleVenueAdminAccess = () => {
-    const isApprovedVenue =
-      user?.user_metadata?.role === 'venue_owner' || user?.user_metadata?.is_approved_venue === true;
-    const isApprovedCoach =
-      user?.user_metadata?.role === 'coach' || user?.user_metadata?.is_approved_coach === true;
+    resetViews();
+    const isSuperAdmin =
+      user?.email &&
+      ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com'].includes(user.email.toLowerCase());
 
-    if (isApprovedVenue || isApprovedCoach) {
-      setShowUserBookings(false);
-      setShowPartnerOnboarding(false);
+    const isApprovedVenue =
+      isSuperAdmin ||
+      user?.user_metadata?.role === 'venue_owner' ||
+      user?.user_metadata?.is_approved_venue === true;
+
+    if (isApprovedVenue) {
       setShowVenueAdmin(true);
     } else {
-      // Navigate smoothly to Partner Onboarding page (No popups!)
-      setShowUserBookings(false);
-      setShowVenueAdmin(false);
       setShowPartnerOnboarding(true);
     }
   };
 
-  //Motion Admin Center Access
-  const [showMotionAdmin, setShowMotionAdmin] = useState(false);
-
   const handleMotionAdminOpen = () => {
-    setShowUserBookings(false);
-    setShowVenueAdmin(false);
-    setShowPartnerOnboarding(false);
+    resetViews();
     setShowMotionAdmin(true);
   };
 
+  const handleBookingsOpen = () => {
+    resetViews();
+    setShowUserBookings(true);
+  };
 
   return (
-    <main className="min-h-screen overflow-hidden">
-      <div className="bg-[#d8ff3e] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
-        Your next game starts here <span className="mx-2">✳</span> Meet you on the court
+    <main className="min-h-screen">
+      {/* STICKY HEADER WRAPPER */}
+      <div className="sticky top-0 z-40 bg-[#f7f8f4]">
+        <div className="bg-[#d8ff3e] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
+          Your next game starts here <span className="mx-2">✳</span> Meet you on the court
+        </div>
+
+        <Navbar
+          user={user}
+          onNavigate={handleNavigate}
+          onBookingsOpen={handleBookingsOpen}
+          onVenueAdminOpen={handleVenueAdminAccess}
+          onMotionAdminOpen={handleMotionAdminOpen}
+          onAuthModalOpen={() => setShowAuthModal(true)}
+        />
       </div>
 
-      <Navbar
-        user={user}
-        onNavigate={handleNavigate}
-        onBookingsOpen={() => {
-          setShowVenueAdmin(false);
-          setShowMotionAdmin(false);
-          setShowUserBookings(true);
-        }}
-        onVenueAdminOpen={handleVenueAdminAccess}
-        onMotionAdminOpen={handleMotionAdminOpen}
-        onAuthModalOpen={() => setShowAuthModal(true)}
-      />
-
-      {showPartnerOnboarding ? (
+      {/* RENDER ACTIVE VIEW BASED ON TOGGLED STATE */}
+      {showMotionAdmin ? (
+        <MotionAdminCenter
+          user={user}
+          onBack={() => resetViews()}
+          onVenueApproved={() => {
+            venueService.getAll().then(setVenues);
+          }}
+        />
+      ) : showPartnerOnboarding ? (
         <PartnerOnboardingView
           user={user}
           venues={venues}
-          onBack={() => setShowPartnerOnboarding(false)}
+          onBack={() => resetViews()}
           onAuthModalOpen={() => setShowAuthModal(true)}
         />
       ) : showUserBookings ? (
         <UserBookingsView
           user={user}
           bookings={bookings}
-          onBack={() => setShowUserBookings(false)}
+          onBack={() => resetViews()}
           onCancel={handleCancelBooking}
         />
       ) : showVenueAdmin ? (
@@ -172,7 +191,7 @@ export default function Home() {
           user={user}
           bookings={bookings}
           venues={venues}
-          onBack={() => setShowVenueAdmin(false)}
+          onBack={() => resetViews()}
           onCancel={handleCancelBooking}
         />
       ) : (
@@ -327,20 +346,58 @@ export default function Home() {
       )}
 
       {confirmed && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" onClick={() => setConfirmed(null)}>
-          <div className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" onClick={(e) => e.stopPropagation()}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" 
+          onClick={() => setConfirmed(null)}
+        >
+          <div 
+            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" 
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
               <Check size={30} strokeWidth={3} />
             </div>
+
             <h2 className="mt-4 text-3xl font-black tracking-tight">You're in. Game on!</h2>
-            <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm">
-              <p className="font-extrabold">{confirmed.venue}</p>
-              <p className="text-xs text-black/50">{confirmed.date} · {confirmed.time}</p>
-              <p className="mt-2 font-black">{money(confirmed.price)}</p>
+
+            <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm space-y-2">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-extrabold text-black">{confirmed.venue}</p>
+                  <p className="text-xs text-black/50 mt-0.5">{confirmed.date} · {confirmed.time}</p>
+                </div>
+                <p className="font-black text-black">{money(confirmed.price)}</p>
+              </div>
+
+              {(user || (confirmed.pointsEarned && confirmed.pointsEarned > 0)) && (
+                <div className="flex items-center justify-between border-t border-black/10 pt-2 text-xs font-bold text-[#5d7112]">
+                  <span>⚡ Points Earned:</span>
+                  <span className="rounded-full bg-[#d8ff3e] px-2.5 py-0.5 font-black text-black">
+                    +{confirmed.pointsEarned || Math.floor(confirmed.price / 10)} PTS
+                  </span>
+                </div>
+              )}
             </div>
-            <button onClick={() => setConfirmed(null)} className="mt-6 w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white">
-              Done
-            </button>
+
+            {/* ACTION BUTTONS */}
+            <div className="mt-6 flex flex-col gap-2">
+              <button 
+                onClick={() => {
+                  setConfirmed(null);
+                  handleBookingsOpen();
+                }} 
+                className="w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white transition hover:bg-[#30372a]"
+              >
+                View my bookings
+              </button>
+
+              <button 
+                onClick={() => setConfirmed(null)} 
+                className="w-full rounded-full border border-black/10 bg-transparent py-2.5 text-xs font-bold text-black/60 transition hover:bg-black/5 hover:text-black"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

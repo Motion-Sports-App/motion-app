@@ -6,8 +6,8 @@ import { partnerService } from '@/lib/services/partnerService';
 
 // List of authorized Motion employee emails
 const MOTION_EMPLOYEE_EMAILS = [
-  'ming@motion.app', // Update with your actual emails
-  'admin@motion.app',
+  'mingtan0403@gmail.com', // Update with your actual emails
+  'motionsportsapp@gmail.com',
 ];
 
 export default function MotionAdminCenter({

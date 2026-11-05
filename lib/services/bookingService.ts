@@ -25,6 +25,14 @@ export type CreateBookingInput = {
   totalCourts?: number;
 };
 
+// Helper to normalize any JS Date object or string to strict 'YYYY-MM-DD'
+const sanitizeDateStr = (dateInput: string): string => {
+  if (!dateInput) return new Date().toISOString().split('T')[0];
+  if (dateInput.includes('T')) return dateInput.split('T')[0];
+  const parsed = new Date(dateInput);
+  return isNaN(parsed.getTime()) ? dateInput : parsed.toISOString().split('T')[0];
+};
+
 export const bookingService = {
   async getByUserEmail(email: string): Promise<Booking[]> {
     const { data, error } = await supabase
@@ -42,7 +50,7 @@ export const bookingService = {
       id: b.booking_code || String(b.id),
       venue: b.venue_name || 'Court Booking',
       sport: b.sport || 'Sports',
-      date: b.booking_date,
+      date: b.booking_date || b.date,
       time: b.booking_time || b.time_slot,
       price: Number(b.total_amount || b.price || 0),
       status: b.status === 'Cancelled' ? 'Cancelled' : 'Confirmed',
@@ -51,11 +59,14 @@ export const bookingService = {
   },
 
   async getOccupiedSlots(venueId: string, date: string): Promise<Record<string, number>> {
+    const cleanDate = sanitizeDateStr(date);
+
+    // Queries booking_date with standardized YYYY-MM-DD
     const { data, error } = await supabase
       .from('bookings')
       .select('booking_time, time_slot, court_count')
       .eq('venue_id', venueId)
-      .eq('booking_date', date)
+      .eq('booking_date', cleanDate)
       .neq('status', 'Cancelled');
 
     if (error) {
@@ -80,11 +91,13 @@ export const bookingService = {
   },
 
   async createViaRPC(input: CreateBookingInput) {
+    const cleanDate = sanitizeDateStr(input.date);
+
     const { data, error } = await supabase.rpc('create_court_booking', {
       p_venue_id: input.venueId,
       p_venue_name: input.venueName,
       p_sport: input.sport,
-      p_booking_date: input.date,
+      p_booking_date: cleanDate,
       p_time_slot: input.timeSlot,
       p_court_count: input.courtCount,
       p_price: input.totalPrice,
