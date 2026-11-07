@@ -48,10 +48,11 @@ export default function MotionAdminCenter({
   ) => {
     setActionId(appId);
     try {
+      // 1. Run Supabase RPC to approve venue & elevate user role
       const res = await partnerService.approveVenueApplication(appId);
 
       if (res.success) {
-        // Send confirmation notification if email exists
+        // 2. Trigger automated email if email is attached
         if (applicantEmail) {
           await fetch('/api/send-approval-email', {
             method: 'POST',
@@ -63,7 +64,6 @@ export default function MotionAdminCenter({
           }).catch((err) => console.error('Email notification failed:', err));
         }
 
-        // Call callback and reload applications
         onVenueApproved();
         await loadApplications();
       } else {
