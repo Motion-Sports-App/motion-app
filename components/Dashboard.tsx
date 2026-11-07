@@ -35,12 +35,14 @@ export default function Dashboard({
   venues,
   onBack,
   onCancel,
+  onVenueUpdate,
 }: {
   user: any;
   bookings: Booking[];
   venues: Venue[];
   onBack: () => void;
   onCancel: (id: string) => void;
+  onVenueUpdate?: (updatedVenue: Venue) => void;
 }) {
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
   const [selectedDate, setSelectedDate] = useState(
@@ -100,7 +102,20 @@ export default function Dashboard({
     if (!selectedVenue?.id) return;
     setIsSaving(true);
     try {
-      await venueService.updateConfig(selectedVenue.id, totalCourts, openTime, closeTime);
+      const updated = await venueService.updateConfig(
+        selectedVenue.id,
+        totalCourts,
+        openTime,
+        closeTime
+      );
+      
+      // Notify parent page of the updated venue numbers
+      if (onVenueUpdate && updated?.[0]) {
+        onVenueUpdate(updated[0]);
+      } else if (onVenueUpdate) {
+        onVenueUpdate({ ...selectedVenue, total_courts: totalCourts });
+      }
+
       setIsEditingConfig(false);
     } catch (err) {
       console.error('Failed to update venue configuration:', err);

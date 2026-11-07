@@ -194,6 +194,19 @@ export default function Home() {
           onBack={() => resetViews()}
           onCancel={handleCancelBooking}
         />
+      ) : showVenueAdmin ? (
+        <Dashboard
+          user={user}
+          bookings={bookings}
+          venues={venues}
+          onBack={() => resetViews()}
+          onCancel={handleCancelBooking}
+          onVenueUpdate={(updatedVenue) => {
+            setVenues((prev) =>
+              prev.map((v) => (v.id === updatedVenue.id ? { ...v, ...updatedVenue } : v))
+            );
+          }}
+        />
       ) : (
         <>
           <section className="mx-auto grid max-w-7xl gap-9 px-5 pb-14 pt-10 sm:pt-14 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:px-8 lg:pb-20 lg:pt-16">
