@@ -1,12 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ShieldCheck, CheckCircle2, XCircle, Building2, Clock } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, CheckCircle2, XCircle, Building2, Clock, RefreshCw } from 'lucide-react';
 import { partnerService } from '@/lib/services/partnerService';
 
 // List of authorized Motion employee emails
 const MOTION_EMPLOYEE_EMAILS = [
-  'mingtan0403@gmail.com', // Update with your actual emails
+  'mingtan0403@gmail.com',
   'motionsportsapp@gmail.com',
 ];
 
@@ -22,7 +22,6 @@ export default function MotionAdminCenter({
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
-  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const isMotionEmployee =
     user?.email &&
@@ -38,7 +37,7 @@ export default function MotionAdminCenter({
   async function loadApplications() {
     setLoading(true);
     const data = await partnerService.getPendingVenueApplications();
-    setApplications(data);
+    setApplications(data || []);
     setLoading(false);
   }
 
@@ -47,7 +46,7 @@ export default function MotionAdminCenter({
     applicantEmail?: string,
     venueName?: string
   ) => {
-    setProcessingId(appId);
+    setActionId(appId);
     try {
       const res = await partnerService.approveVenueApplication(appId);
 
@@ -64,15 +63,16 @@ export default function MotionAdminCenter({
           }).catch((err) => console.error('Email notification failed:', err));
         }
 
-        // Refresh pending list
-        loadApplications();
+        // Call callback and reload applications
+        onVenueApproved();
+        await loadApplications();
       } else {
         alert(res.error || 'Failed to approve application.');
       }
     } catch (err) {
       console.error('Error approving application:', err);
     } finally {
-      setProcessingId(null);
+      setActionId(null);
     }
   };
 
@@ -114,6 +114,14 @@ export default function MotionAdminCenter({
           <h1 className="mt-2 text-3xl font-black text-black">Motion Affiliation Requester Center</h1>
           <p className="mt-1 text-xs text-black/55">Review and authorize incoming venue partnership submissions.</p>
         </div>
+
+        <button
+          onClick={loadApplications}
+          disabled={loading}
+          className="flex items-center gap-2 rounded-xl border border-black/15 bg-white px-4 py-2 text-xs font-bold shadow-xs hover:bg-black/5 transition"
+        >
+          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
+        </button>
       </div>
 
       <div className="mt-8 space-y-4">
@@ -146,11 +154,17 @@ export default function MotionAdminCenter({
                 <p className="text-xs text-black/60">
                   {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
                 </p>
+                {app.applicant_email && (
+                  <p className="mt-1 text-[11px] font-semibold text-black/40">
+                    Applicant: {app.applicant_email}
+                  </p>
+                )}
                 {app.description && <p className="mt-2 text-xs italic text-black/70">"{app.description}"</p>}
               </div>
 
               <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
-                {app.status === 'pending_motion_approval' ? (
+                {/* Updated status check to catch 'pending' applications */}
+                {app.status === 'pending' || app.status === 'pending_motion_approval' ? (
                   <>
                     <button
                       disabled={actionId === app.id}
