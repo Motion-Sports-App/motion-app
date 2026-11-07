@@ -20,4 +20,19 @@ export const venueService = {
       sport: v.sport || 'Sports',
     }));
   },
+
+  // Add inside lib/services/venueService.ts
+  async updateConfig(venueId: string, totalCourts: number, openTime: string, closeTime: string) {
+    const { data, error } = await supabase
+      .from('venues')
+      .update({ 
+        total_courts: totalCourts,
+        // Stored optionally if open_time / close_time columns exist on your table
+      })
+      .eq('id', venueId)
+      .select();
+
+    if (error) throw error;
+    return data;
+  },
 };

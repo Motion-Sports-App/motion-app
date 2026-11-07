@@ -13,12 +13,15 @@ import {
   Sliders,
   Edit2,
   Check,
+  Loader2,
 } from 'lucide-react';
+import { venueService } from '@/lib/services/venueService';
 import type { Booking } from '@/lib/services/bookingService';
 import type { Venue } from '@/lib/data';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 
+// 24-Hour Range
 const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -47,10 +50,9 @@ export default function Dashboard({
     venues[0]?.id || '1'
   );
 
-  // Edit Mode Lock Toggle
   const [isEditingConfig, setIsEditingConfig] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Editable Venue Settings
   const selectedVenue = useMemo(
     () => venues.find((v) => v.id === selectedVenueId) || venues[0],
     [venues, selectedVenueId]
@@ -62,10 +64,8 @@ export default function Dashboard({
   const [openTime, setOpenTime] = useState('08:00');
   const [closeTime, setCloseTime] = useState('22:00');
 
-  // Matrix override state: key format "date_courtIndex_time" -> false (blocked)
   const [blockedSlots, setBlockedSlots] = useState<Record<string, boolean>>({});
 
-  // Stats Calculations
   const stats = useMemo(() => {
     const active = bookings.filter((b) => b.status === 'Confirmed');
     const cancelled = bookings.filter((b) => b.status === 'Cancelled');
@@ -79,7 +79,6 @@ export default function Dashboard({
     };
   }, [bookings, venues]);
 
-  // Filter time slots based on open and close bounds
   const activeHours = useMemo(() => {
     const startHour = parseInt(openTime.split(':')[0], 10);
     const endHour = parseInt(closeTime.split(':')[0], 10);
@@ -97,9 +96,21 @@ export default function Dashboard({
     }));
   };
 
+  const handleSaveConfig = async () => {
+    if (!selectedVenue?.id) return;
+    setIsSaving(true);
+    try {
+      await venueService.updateConfig(selectedVenue.id, totalCourts, openTime, closeTime);
+      setIsEditingConfig(false);
+    } catch (err) {
+      console.error('Failed to update venue configuration:', err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-10 lg:px-8 lg:py-16">
-      {/* HEADER & ROLE SWITCHER */}
       <button
         onClick={onBack}
         className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 transition hover:text-black"
@@ -118,7 +129,6 @@ export default function Dashboard({
           </p>
         </div>
 
-        {/* ROLE TOGGLE BUTTONS */}
         <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
           <button
             onClick={() => setActiveRole('venue')}
@@ -143,7 +153,6 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* METRICS STATS BAR */}
       <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
@@ -178,18 +187,16 @@ export default function Dashboard({
         </div>
       </div>
 
-      {/* VENUE SPECIFIC: TIMESLOT MATRIX & CONFIGURATION */}
       {activeRole === 'venue' && (
         <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
             <div>
               <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
               <p className="mt-1 text-xs text-black/50">
-                Configure courts and block out hours for maintenance or private events.
+                Click slots to toggle status. White represents available, Red represents blocked/taken.
               </p>
             </div>
 
-            {/* DATE & VENUE CONFIG CONTROLS */}
             <div className="flex flex-wrap items-center gap-3">
               <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
                 <Calendar size={15} />
@@ -201,16 +208,24 @@ export default function Dashboard({
                 />
               </label>
 
-              {/* EDIT TOGGLE BUTTON */}
               <button
-                onClick={() => setIsEditingConfig(!isEditingConfig)}
-                className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition ${
+                onClick={() => {
+                  if (isEditingConfig) {
+                    handleSaveConfig();
+                  } else {
+                    setIsEditingConfig(true);
+                  }
+                }}
+                disabled={isSaving}
+                className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
                   isEditingConfig
-                    ? 'bg-[#d8ff3e] text-black border border-black/20'
+                    ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
                     : 'bg-[#101310] text-white hover:bg-black/80'
                 }`}
               >
-                {isEditingConfig ? (
+                {isSaving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : isEditingConfig ? (
                   <>
                     <Check size={14} /> Save Config
                   </>
@@ -223,7 +238,6 @@ export default function Dashboard({
             </div>
           </div>
 
-          {/* HOURS & COURTS CONFIGURATION BAR (EDITABLE ONLY WHEN UNLOCKED) */}
           <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
             isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
           }`}>
@@ -278,15 +292,8 @@ export default function Dashboard({
                 ))}
               </select>
             </div>
-
-            {!isEditingConfig && (
-              <span className="text-[11px] text-black/40 italic ml-auto">
-                🔒 Click "Edit Settings" to modify court count or hours
-              </span>
-            )}
           </div>
 
-          {/* TIMESLOT SPREADSHEET TABLE */}
           <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
             <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
@@ -301,24 +308,23 @@ export default function Dashboard({
               </thead>
               <tbody className="divide-y divide-black/10 text-xs">
                 {activeHours.map((time) => (
-                  <tr key={time} className="hover:bg-black/[0.02]">
+                  <tr key={time} className="hover:bg-black/[0.01]">
                     <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
                       {time}
                     </td>
                     {Array.from({ length: totalCourts }).map((_, i) => {
                       const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
                       return (
-                        <td key={i} className="p-2 border-r border-black/10 text-center">
+                        <td key={i} className="p-1.5 border-r border-black/10 text-center">
                           <button
                             onClick={() => toggleSlotStatus(i + 1, time)}
-                            className={`w-full rounded-lg py-2 text-[11px] font-black transition ${
+                            title={isBlocked ? 'Blocked / Taken' : 'Available'}
+                            className={`h-9 w-full rounded-xl border transition shadow-2xs ${
                               isBlocked
-                                ? 'bg-red-100 text-red-600 border border-red-200 hover:bg-red-200'
-                                : 'bg-[#eef7cf] text-[#556912] border border-[#d3ea8c] hover:bg-[#dff0a6]'
+                                ? 'bg-red-500 border-red-600 hover:bg-red-600'
+                                : 'bg-white border-black/15 hover:bg-[#eef7cf]'
                             }`}
-                          >
-                            {isBlocked ? 'BLOCKED' : 'AVAILABLE'}
-                          </button>
+                          />
                         </td>
                       );
                     })}
@@ -330,7 +336,6 @@ export default function Dashboard({
         </div>
       )}
 
-      {/* MASTER RESERVATIONS LIST */}
       <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
         <h2 className="text-2xl font-black tracking-tight">Master Reservation List</h2>
         <p className="mt-1 text-xs text-black/50">
