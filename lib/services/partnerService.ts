@@ -80,4 +80,53 @@ export const partnerService = {
       return { success: false, error: error.message };
     }
   },
+
+  // Fetch pending venue applications for Motion Admin Center
+  async getPendingVenueApplications() {
+    try {
+      const { data, error } = await supabase
+        .from('venue_applications')
+        .select('*')
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error) {
+      console.error('getPendingVenueApplications Error:', error);
+      return [];
+    }
+  },
+
+  // Approve a venue application using Supabase RPC
+  async approveVenueApplication(applicationId: string) {
+    try {
+      const { data, error } = await supabase.rpc('approve_venue_application', {
+        p_application_id: applicationId,
+      });
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('approveVenueApplication Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Reject a venue application
+  async rejectVenueApplication(applicationId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('venue_applications')
+        .update({ status: 'rejected' })
+        .eq('id', applicationId)
+        .select();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('rejectVenueApplication Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
 };
