@@ -7,12 +7,12 @@ import {
   Calendar,
   Clock,
   DollarSign,
-  Plus,
-  Save,
   UserCheck,
   XCircle,
   CheckCircle2,
   Sliders,
+  Edit2,
+  Check,
 } from 'lucide-react';
 import type { Booking } from '@/lib/services/bookingService';
 import type { Venue } from '@/lib/data';
@@ -46,7 +46,9 @@ export default function Dashboard({
     venues[0]?.id || '1'
   );
 
-  // Editable Venue Settings
+  // Edit Mode Lock Toggle
+  const [isEditingConfig, setIsEditingConfig] = useState(false);
+
   // Editable Venue Settings
   const selectedVenue = useMemo(
     () => venues.find((v) => v.id === selectedVenueId) || venues[0],
@@ -198,29 +200,62 @@ export default function Dashboard({
                 />
               </label>
 
-              <div className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
-                <Sliders size={15} />
-                <span>Courts:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={20}
-                  value={totalCourts}
-                  onChange={(e) => setTotalCourts(Number(e.target.value))}
-                  className="w-12 bg-white rounded border border-black/10 px-1 text-center font-bold"
-                />
-              </div>
+              {/* EDIT TOGGLE BUTTON */}
+              <button
+                onClick={() => setIsEditingConfig(!isEditingConfig)}
+                className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-extrabold transition ${
+                  isEditingConfig
+                    ? 'bg-[#d8ff3e] text-black border border-black/20'
+                    : 'bg-[#101310] text-white hover:bg-black/80'
+                }`}
+              >
+                {isEditingConfig ? (
+                  <>
+                    <Check size={14} /> Save Config
+                  </>
+                ) : (
+                  <>
+                    <Edit2 size={14} /> Edit Settings
+                  </>
+                )}
+              </button>
             </div>
           </div>
 
-          {/* HOURS RANGE SELECTOR */}
-          <div className="mt-4 flex items-center gap-4 text-xs font-bold text-black/70">
+          {/* HOURS & COURTS CONFIGURATION BAR (EDITABLE ONLY WHEN UNLOCKED) */}
+          <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
+            isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
+          }`}>
             <div className="flex items-center gap-2">
-              <Clock size={14} /> Operating Hours:
+              <Sliders size={15} className="text-black/50" />
+              <span>Courts Count:</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                disabled={!isEditingConfig}
+                value={totalCourts}
+                onChange={(e) => setTotalCourts(Number(e.target.value))}
+                className={`w-14 rounded border px-2 py-1 text-center font-bold outline-none ${
+                  isEditingConfig
+                    ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
+                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                }`}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Clock size={15} className="text-black/50" />
+              <span>Operating Hours:</span>
               <select
+                disabled={!isEditingConfig}
                 value={openTime}
                 onChange={(e) => setOpenTime(e.target.value)}
-                className="rounded-lg border border-black/15 bg-white px-2 py-1"
+                className={`rounded-lg border px-2 py-1 outline-none ${
+                  isEditingConfig
+                    ? 'bg-white border-black/30'
+                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                }`}
               >
                 {DEFAULT_HOURS.map((h) => (
                   <option key={h} value={h}>{h}</option>
@@ -228,15 +263,26 @@ export default function Dashboard({
               </select>
               <span>to</span>
               <select
+                disabled={!isEditingConfig}
                 value={closeTime}
                 onChange={(e) => setCloseTime(e.target.value)}
-                className="rounded-lg border border-black/15 bg-white px-2 py-1"
+                className={`rounded-lg border px-2 py-1 outline-none ${
+                  isEditingConfig
+                    ? 'bg-white border-black/30'
+                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                }`}
               >
                 {DEFAULT_HOURS.map((h) => (
                   <option key={h} value={h}>{h}</option>
                 ))}
               </select>
             </div>
+
+            {!isEditingConfig && (
+              <span className="text-[11px] text-black/40 italic ml-auto">
+                🔒 Click "Edit Settings" to modify court count or hours
+              </span>
+            )}
           </div>
 
           {/* TIMESLOT SPREADSHEET TABLE */}
