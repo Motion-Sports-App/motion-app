@@ -21,7 +21,6 @@ export interface CoachApplicationData {
 }
 
 export const partnerService = {
-  // Submit venue application linked to the user's ID and email
   async submitVenueApplication(userId: string, data: VenueApplicationData) {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -53,7 +52,6 @@ export const partnerService = {
     }
   },
 
-  // Submit coach application linked to the user's ID
   async submitCoachApplication(userId: string, data: CoachApplicationData) {
     try {
       const { data: result, error } = await supabase
@@ -81,7 +79,6 @@ export const partnerService = {
     }
   },
 
-  // Fetch pending venue applications for Motion Admin Center
   async getPendingVenueApplications() {
     try {
       const { data, error } = await supabase
@@ -98,7 +95,6 @@ export const partnerService = {
     }
   },
 
-  // Approve a venue application using Supabase RPC
   async approveVenueApplication(applicationId: string) {
     try {
       const { data, error } = await supabase.rpc('approve_venue_application', {
@@ -113,7 +109,6 @@ export const partnerService = {
     }
   },
 
-  // Reject a venue application
   async rejectVenueApplication(applicationId: string) {
     try {
       const { data, error } = await supabase

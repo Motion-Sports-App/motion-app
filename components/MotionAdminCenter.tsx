@@ -22,6 +22,7 @@ export default function MotionAdminCenter({
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const isMotionEmployee =
     user?.email &&
@@ -41,16 +42,37 @@ export default function MotionAdminCenter({
     setLoading(false);
   }
 
-  const handleApprove = async (id: string) => {
-    setActionId(id);
-    const res = await partnerService.approveVenueApplication(id);
-    setActionId(null);
+  const handleApprove = async (
+    appId: string,
+    applicantEmail?: string,
+    venueName?: string
+  ) => {
+    setProcessingId(appId);
+    try {
+      const res = await partnerService.approveVenueApplication(appId);
 
-    if (res.success) {
-      await loadApplications();
-      onVenueApproved(); // Refresh live venue discovery list
-    } else {
-      alert('Failed to approve venue: ' + res.error);
+      if (res.success) {
+        // Send confirmation notification if email exists
+        if (applicantEmail) {
+          await fetch('/api/send-approval-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: applicantEmail,
+              venueName: venueName || 'Your Venue',
+            }),
+          }).catch((err) => console.error('Email notification failed:', err));
+        }
+
+        // Refresh pending list
+        loadApplications();
+      } else {
+        alert(res.error || 'Failed to approve application.');
+      }
+    } catch (err) {
+      console.error('Error approving application:', err);
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -132,7 +154,7 @@ export default function MotionAdminCenter({
                   <>
                     <button
                       disabled={actionId === app.id}
-                      onClick={() => handleApprove(app.id)}
+                      onClick={() => handleApprove(app.id, app.applicant_email, app.name)}
                       className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
                     >
                       {actionId === app.id ? 'Publishing...' : 'Approve & Publish'}
