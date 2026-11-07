@@ -47,13 +47,14 @@ export default function Dashboard({
   );
 
   // Editable Venue Settings
+  // Editable Venue Settings
   const selectedVenue = useMemo(
     () => venues.find((v) => v.id === selectedVenueId) || venues[0],
     [venues, selectedVenueId]
   );
 
   const [totalCourts, setTotalCourts] = useState<number>(
-    selectedVenue?.totalCourts || 6
+    selectedVenue?.total_courts || 6
   );
   const [openTime, setOpenTime] = useState('08:00');
   const [closeTime, setCloseTime] = useState('22:00');
