@@ -1,10 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ShieldCheck, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, RefreshCw, Trash2, Building2, Clock } from 'lucide-react';
 import { partnerService } from '@/lib/services/partnerService';
 
-// List of authorized Motion employee emails
 const MOTION_EMPLOYEE_EMAILS = [
   'mingtan0403@gmail.com',
   'motionsportsapp@gmail.com',
@@ -19,7 +18,9 @@ export default function MotionAdminCenter({
   onBack: () => void;
   onVenueApproved: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'applications' | 'active_venues'>('applications');
   const [applications, setApplications] = useState<any[]>([]);
+  const [venues, setVenues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -30,14 +31,19 @@ export default function MotionAdminCenter({
 
   useEffect(() => {
     if (isMotionEmployee) {
-      loadApplications();
+      loadData();
     }
-  }, [isMotionEmployee]);
+  }, [isMotionEmployee, activeTab]);
 
-  async function loadApplications() {
+  async function loadData() {
     setLoading(true);
-    const data = await partnerService.getPendingVenueApplications();
-    setApplications(data || []);
+    if (activeTab === 'applications') {
+      const data = await partnerService.getPendingVenueApplications();
+      setApplications(data || []);
+    } else {
+      const data = await partnerService.getAllVenues();
+      setVenues(data || []);
+    }
     setLoading(false);
   }
 
@@ -63,7 +69,7 @@ export default function MotionAdminCenter({
         }
 
         onVenueApproved();
-        await loadApplications();
+        await loadData();
       } else {
         alert(res.error || 'Failed to approve application.');
       }
@@ -78,24 +84,24 @@ export default function MotionAdminCenter({
     setActionId(id);
     await partnerService.rejectVenueApplication(id);
     setActionId(null);
-    await loadApplications();
+    await loadData();
   };
 
-  const handleDelete = async (id: string, venueName: string) => {
-    if (!confirm(`Are you sure you want to permanently delete "${venueName}"?`)) {
+  const handleDeleteVenue = async (venueId: string, ownerId: string, venueName: string) => {
+    if (!confirm(`Are you sure you want to delete active venue "${venueName}" and reset the application for testing?`)) {
       return;
     }
 
-    setActionId(id);
+    setActionId(venueId);
     try {
-      const res = await partnerService.deleteVenueApplication(id);
+      const res = await partnerService.deleteVenueAndResetUser(venueId, ownerId);
       if (res.success) {
-        await loadApplications();
+        await loadData();
       } else {
-        alert(res.error || 'Failed to delete application.');
+        alert(res.error || 'Failed to delete venue.');
       }
     } catch (err) {
-      console.error('Error deleting application:', err);
+      console.error('Error deleting venue:', err);
     } finally {
       setActionId(null);
     }
@@ -124,17 +130,17 @@ export default function MotionAdminCenter({
         <ArrowLeft size={17} /> Back to dashboard
       </button>
 
-      <div className="flex items-center justify-between border-b border-black/10 pb-6">
+      <div className="flex flex-col gap-4 border-b border-black/10 pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <span className="rounded-full bg-[#101310] px-3 py-1 text-[10px] font-black text-[#d8ff3e]">
             INTERNAL HQ ONLY
           </span>
-          <h1 className="mt-2 text-3xl font-black text-black">Motion Affiliation Requester Center</h1>
-          <p className="mt-1 text-xs text-black/55">Review, authorize, or remove incoming venue partnership submissions.</p>
+          <h1 className="mt-2 text-3xl font-black text-black">Motion HQ Control Center</h1>
+          <p className="mt-1 text-xs text-black/55">Manage venue approvals and clear test venue records.</p>
         </div>
 
         <button
-          onClick={loadApplications}
+          onClick={loadData}
           disabled={loading}
           className="flex items-center gap-2 rounded-xl border border-black/15 bg-white px-4 py-2 text-xs font-bold shadow-xs hover:bg-black/5 transition"
         >
@@ -142,82 +148,124 @@ export default function MotionAdminCenter({
         </button>
       </div>
 
-      <div className="mt-8 space-y-4">
+      {/* Navigation Tabs */}
+      <div className="mt-6 flex border-b border-black/10 text-xs font-bold">
+        <button
+          onClick={() => setActiveTab('applications')}
+          className={`pb-3 px-4 ${
+            activeTab === 'applications'
+              ? 'border-b-2 border-black text-black'
+              : 'text-black/40 hover:text-black/70'
+          }`}
+        >
+          Pending Applications ({applications.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('active_venues')}
+          className={`pb-3 px-4 ${
+            activeTab === 'active_venues'
+              ? 'border-b-2 border-black text-black'
+              : 'text-black/40 hover:text-black/70'
+          }`}
+        >
+          Active Venues ({venues.length})
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      <div className="mt-6 space-y-4">
         {loading ? (
-          <div className="p-12 text-center text-xs font-bold text-black/40">Loading applications...</div>
-        ) : applications.length > 0 ? (
-          applications.map((app) => (
-            <div
-              key={app.id}
-              className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
-                    {app.sport}
-                  </span>
-                  <span
-                    className={`rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase ${
-                      app.status === 'approved'
-                        ? 'bg-green-100 text-green-700'
-                        : app.status === 'rejected'
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
-                  >
-                    {app.status.replace('_', ' ')}
-                  </span>
-                </div>
-                <h3 className="mt-1 text-xl font-black text-black">{app.name}</h3>
-                <p className="text-xs text-black/60">
-                  {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
-                </p>
-                {app.applicant_email && (
-                  <p className="mt-1 text-[11px] font-semibold text-black/40">
-                    Applicant: {app.applicant_email}
+          <div className="p-12 text-center text-xs font-bold text-black/40">Loading data...</div>
+        ) : activeTab === 'applications' ? (
+          applications.length > 0 ? (
+            applications.map((app) => (
+              <div
+                key={app.id}
+                className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
+                      {app.sport}
+                    </span>
+                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-800">
+                      {app.status.replace('_', ' ')}
+                    </span>
+                  </div>
+                  <h3 className="mt-1 text-xl font-black text-black">{app.name}</h3>
+                  <p className="text-xs text-black/60">
+                    {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
                   </p>
-                )}
-                {app.description && <p className="mt-2 text-xs italic text-black/70">"{app.description}"</p>}
+                  {app.applicant_email && (
+                    <p className="mt-1 text-[11px] font-semibold text-black/40">
+                      Applicant: {app.applicant_email}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
+                  <button
+                    disabled={actionId === app.id}
+                    onClick={() => handleApprove(app.id, app.applicant_email, app.name)}
+                    className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
+                  >
+                    {actionId === app.id ? 'Publishing...' : 'Approve & Publish'}
+                  </button>
+                  <button
+                    disabled={actionId === app.id}
+                    onClick={() => handleReject(app.id)}
+                    className="rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </div>
               </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
+              No pending venue applications found.
+            </div>
+          )
+        ) : (
+          /* Active Venues Tab */
+          venues.length > 0 ? (
+            venues.map((venue) => (
+              <div
+                key={venue.id}
+                className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
+                      {venue.sport}
+                    </span>
+                    <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-[9px] font-black uppercase text-green-700">
+                      Active Venue
+                    </span>
+                  </div>
+                  <h3 className="mt-1 text-xl font-black text-black">{venue.name}</h3>
+                  <p className="text-xs text-black/60">
+                    {venue.area} · {venue.address} · {venue.total_courts} Courts @ ฿{venue.price_per_hour || venue.price}/hr
+                  </p>
+                  <p className="mt-1 text-[11px] font-mono text-black/40">
+                    Owner ID: {venue.owner_id || 'N/A'}
+                  </p>
+                </div>
 
-              <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
-                {app.status === 'pending' || app.status === 'pending_motion_approval' ? (
-                  <>
-                    <button
-                      disabled={actionId === app.id}
-                      onClick={() => handleApprove(app.id, app.applicant_email, app.name)}
-                      className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
-                    >
-                      {actionId === app.id ? 'Publishing...' : 'Approve & Publish'}
-                    </button>
-                    <button
-                      disabled={actionId === app.id}
-                      onClick={() => handleReject(app.id)}
-                      className="rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
-                    >
-                      Decline
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-xs font-bold text-black/40">Processed</span>
-                )}
-
-                {/* Delete Button to clear test submissions */}
                 <button
-                  disabled={actionId === app.id}
-                  onClick={() => handleDelete(app.id, app.name)}
-                  title="Delete Application"
-                  className="ml-2 flex items-center justify-center rounded-full p-2.5 text-black/40 hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50"
+                  disabled={actionId === venue.id}
+                  onClick={() => handleDeleteVenue(venue.id, venue.owner_id, venue.name)}
+                  className="flex items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={15} /> Delete Venue & Reset Account
                 </button>
               </div>
+            ))
+          ) : (
+            <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
+              No active venues found in database.
             </div>
-          ))
-        ) : (
-          <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
-            No venue applications currently awaiting review.
-          </div>
+          )
         )}
       </div>
     </section>

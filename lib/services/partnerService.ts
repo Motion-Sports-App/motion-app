@@ -139,4 +139,52 @@ export const partnerService = {
       return { success: false, error: error.message };
     }
   },
+
+  async getAllVenues() {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data || [];
+    } catch (error: any) {
+      console.error('getAllVenues Error:', error);
+      return [];
+    }
+  },
+
+  // Completely delete a venue and reset the user's application state for re-testing
+  async deleteVenueAndResetUser(venueId: string, ownerId?: string) {
+    try {
+      // 1. Delete the created venue
+      const { error: venueErr } = await supabase
+        .from('venues')
+        .delete()
+        .eq('id', venueId);
+
+      if (venueErr) throw venueErr;
+
+      // 2. Clear out existing applications for this user so they can submit fresh ones
+      if (ownerId) {
+        await supabase
+          .from('venue_applications')
+          .delete()
+          .eq('user_id', ownerId);
+
+        // Optional: Reset user metadata back to standard user role
+        /*
+        await supabase.auth.admin.updateUserById(ownerId, {
+          user_metadata: { role: 'user', is_approved_venue: false }
+        });
+        */
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('deleteVenueAndResetUser Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
 };
