@@ -124,4 +124,19 @@ export const partnerService = {
       return { success: false, error: error.message };
     }
   },
+
+  async deleteVenueApplication(applicationId: string) {
+    try {
+      const { error } = await supabase
+        .from('venue_applications')
+        .delete()
+        .eq('id', applicationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      console.error('deleteVenueApplication Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
 };

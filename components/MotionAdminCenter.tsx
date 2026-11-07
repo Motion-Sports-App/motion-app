@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, ShieldCheck, CheckCircle2, XCircle, Building2, Clock, RefreshCw } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, RefreshCw, Trash2 } from 'lucide-react';
 import { partnerService } from '@/lib/services/partnerService';
 
 // List of authorized Motion employee emails
@@ -48,11 +48,9 @@ export default function MotionAdminCenter({
   ) => {
     setActionId(appId);
     try {
-      // 1. Run Supabase RPC to approve venue & elevate user role
       const res = await partnerService.approveVenueApplication(appId);
 
       if (res.success) {
-        // 2. Trigger automated email if email is attached
         if (applicantEmail) {
           await fetch('/api/send-approval-email', {
             method: 'POST',
@@ -81,6 +79,26 @@ export default function MotionAdminCenter({
     await partnerService.rejectVenueApplication(id);
     setActionId(null);
     await loadApplications();
+  };
+
+  const handleDelete = async (id: string, venueName: string) => {
+    if (!confirm(`Are you sure you want to permanently delete "${venueName}"?`)) {
+      return;
+    }
+
+    setActionId(id);
+    try {
+      const res = await partnerService.deleteVenueApplication(id);
+      if (res.success) {
+        await loadApplications();
+      } else {
+        alert(res.error || 'Failed to delete application.');
+      }
+    } catch (err) {
+      console.error('Error deleting application:', err);
+    } finally {
+      setActionId(null);
+    }
   };
 
   if (!isMotionEmployee) {
@@ -112,7 +130,7 @@ export default function MotionAdminCenter({
             INTERNAL HQ ONLY
           </span>
           <h1 className="mt-2 text-3xl font-black text-black">Motion Affiliation Requester Center</h1>
-          <p className="mt-1 text-xs text-black/55">Review and authorize incoming venue partnership submissions.</p>
+          <p className="mt-1 text-xs text-black/55">Review, authorize, or remove incoming venue partnership submissions.</p>
         </div>
 
         <button
@@ -163,7 +181,6 @@ export default function MotionAdminCenter({
               </div>
 
               <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
-                {/* Updated status check to catch 'pending' applications */}
                 {app.status === 'pending' || app.status === 'pending_motion_approval' ? (
                   <>
                     <button
@@ -184,6 +201,16 @@ export default function MotionAdminCenter({
                 ) : (
                   <span className="text-xs font-bold text-black/40">Processed</span>
                 )}
+
+                {/* Delete Button to clear test submissions */}
+                <button
+                  disabled={actionId === app.id}
+                  onClick={() => handleDelete(app.id, app.name)}
+                  title="Delete Application"
+                  className="ml-2 flex items-center justify-center rounded-full p-2.5 text-black/40 hover:bg-red-50 hover:text-red-600 transition disabled:opacity-50"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
             </div>
           ))
