@@ -1,18 +1,32 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   try {
+    const apiKey = process.env.RESEND_API_KEY;
+
+    if (!apiKey) {
+      console.warn('RESEND_API_KEY is not set. Email not sent.');
+      return NextResponse.json(
+        { error: 'RESEND_API_KEY is missing from environment variables.' },
+        { status: 500 }
+      );
+    }
+
+    // Initialize Resend dynamically inside the request handler
+    const resend = new Resend(apiKey);
     const { email, venueName } = await req.json();
 
     if (!email) {
       return NextResponse.json({ error: 'Missing applicant email' }, { status: 400 });
     }
 
+    const fromAddress = process.env.NODE_ENV === 'production'
+      ? 'Motion Team <partners@motion.sports.com>'
+      : 'Motion Team <onboarding@resend.dev>';
+
     const data = await resend.emails.send({
-      from: 'Motion Team <onboarding@resend.dev>', // Update with your custom domain once verified
+      from: fromAddress, // Update with your verified domain in production
       to: [email],
       subject: `🎉 Application Approved: ${venueName} is live on Motion!`,
       html: `
