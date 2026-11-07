@@ -33,18 +33,24 @@ export default function MotionAdminCenter({
     if (isMotionEmployee) {
       loadData();
     }
-  }, [isMotionEmployee, activeTab]);
+  }, [isMotionEmployee]);
 
   async function loadData() {
     setLoading(true);
-    if (activeTab === 'applications') {
-      const data = await partnerService.getPendingVenueApplications();
-      setApplications(data || []);
-    } else {
-      const data = await partnerService.getAllVenues();
-      setVenues(data || []);
+    try {
+      // Fetch both datasets concurrently using Promise.all
+      const [appsData, venuesData] = await Promise.all([
+        partnerService.getPendingVenueApplications(),
+        partnerService.getAllVenues(),
+      ]);
+
+      setApplications(appsData || []);
+      setVenues(venuesData || []);
+    } catch (err) {
+      console.error('Failed to load control center data:', err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }
 
   const handleApprove = async (
@@ -96,12 +102,15 @@ export default function MotionAdminCenter({
     try {
       const res = await partnerService.deleteVenueAndResetUser(venueId, ownerId);
       if (res.success) {
+        // Optimistically remove from state and refresh
+        setVenues((prev) => prev.filter((v) => v.id !== venueId));
         await loadData();
       } else {
-        alert(res.error || 'Failed to delete venue.');
+        alert(`Delete failed: ${res.error}`);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting venue:', err);
+      alert(`Error deleting venue: ${err.message}`);
     } finally {
       setActionId(null);
     }

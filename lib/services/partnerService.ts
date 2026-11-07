@@ -158,27 +158,15 @@ export const partnerService = {
   // Completely delete a venue and reset the user's application state for re-testing
   async deleteVenueAndResetUser(venueId: string, ownerId?: string) {
     try {
-      // 1. Delete the created venue
-      const { error: venueErr } = await supabase
-        .from('venues')
-        .delete()
-        .eq('id', venueId);
+      const { data, error } = await supabase.rpc('delete_venue_and_reset_user', {
+        p_venue_id: venueId,
+        p_owner_id: ownerId || null,
+      });
 
-      if (venueErr) throw venueErr;
-
-      // 2. Clear out existing applications for this user so they can submit fresh ones
-      if (ownerId) {
-        await supabase
-          .from('venue_applications')
-          .delete()
-          .eq('user_id', ownerId);
-
-        // Optional: Reset user metadata back to standard user role
-        /*
-        await supabase.auth.admin.updateUserById(ownerId, {
-          user_metadata: { role: 'user', is_approved_venue: false }
-        });
-        */
+      if (error) throw error;
+      
+      if (data && data.success === false) {
+        throw new Error(data.error || 'Failed to delete venue');
       }
 
       return { success: true };
