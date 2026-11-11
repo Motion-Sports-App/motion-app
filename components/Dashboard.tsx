@@ -41,7 +41,7 @@ export default function Dashboard({
   venues: Venue[];
   onBack: () => void;
   onCancel: (id: string) => void;
-  onVenueUpdate?: (updatedVenue: any) => void;
+  onVenueUpdate?: (updatedVenue: Venue) => void;
 }) {
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
   const [selectedDate, setSelectedDate] = useState(
@@ -52,30 +52,25 @@ export default function Dashboard({
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Automatically pick the user's owned venue or fallback to first venue
   const selectedVenue = useMemo(() => {
     if (!venues || venues.length === 0) return null;
     return (
       venues.find((v) => v.id === selectedVenueId) ||
-      venues.find((v) => v.user_id === user?.id || (v as any).owner_id === user?.id) ||
+      venues.find((v) => v.user_id === user?.id || v.owner_id === user?.id) ||
       venues[0]
     );
   }, [venues, selectedVenueId, user]);
 
-  // Form State
   const [totalCourts, setTotalCourts] = useState<number>(1);
   const [openTime, setOpenTime] = useState<string>('08:00');
   const [closeTime, setCloseTime] = useState<string>('22:00');
   const [blockedSlots, setBlockedSlots] = useState<Record<string, boolean>>({});
 
-  // SYNC local state whenever selected venue data changes or loads from Supabase
   useEffect(() => {
     if (selectedVenue) {
-      // 1. Sync Court Count safely
-      const courtCount = selectedVenue.total_courts ?? (selectedVenue as any).totalCourts ?? 1;
+      const courtCount = selectedVenue.total_courts ?? 1;
       setTotalCourts(Number(courtCount) > 0 ? Number(courtCount) : 1);
 
-      // 2. Parse Operating Hours with explicit type narrowing
       let parsedHours: OperatingHours | null = null;
       const rawHours = selectedVenue.operating_hours;
 
@@ -141,20 +136,22 @@ export default function Dashboard({
         },
       };
 
-      // Call partnerService to write changes into Supabase
       const res = await partnerService.updateVenueMatrix(selectedVenue.id, matrixPayload);
 
       if (res.success) {
-        const updatedRecord = Array.isArray(res.data) ? res.data[0] : res.data;
-        
-        const fullUpdatedVenue = {
-        ...selectedVenue,
-        ...matrixPayload,
-        ...(updatedRecord || {}),
-      };
+        const dbRecord = Array.isArray(res.data) ? res.data[0] : res.data;
+
+        // Clean merge preserving existing fields like facilities & slots
+        const mergedVenue: Venue = {
+          ...selectedVenue,
+          facilities: selectedVenue.facilities || [],
+          slots: selectedVenue.slots || [],
+          ...matrixPayload,
+          ...(dbRecord || {}),
+        };
 
         if (onVenueUpdate) {
-          onVenueUpdate(fullUpdatedVenue);
+          onVenueUpdate(mergedVenue);
         }
         setIsEditingConfig(false);
       } else {

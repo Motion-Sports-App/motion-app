@@ -58,7 +58,6 @@ export default function Home() {
   const [showMotionAdmin, setShowMotionAdmin] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Helper to reset all view flags when changing views
   const resetViews = () => {
     setShowUserBookings(false);
     setShowVenueAdmin(false);
@@ -95,7 +94,12 @@ export default function Home() {
 
   const loadVenues = async () => {
     const data = await venueService.getAll();
-    setVenues(data || []);
+    const safeData = (data || []).map((v) => ({
+      ...v,
+      facilities: v.facilities || [],
+      slots: v.slots || [],
+    }));
+    setVenues(safeData);
     setLoading(false);
   };
 
@@ -200,7 +204,16 @@ export default function Home() {
           onCancel={handleCancelBooking}
           onVenueUpdate={(updatedVenue) => {
             setVenues((prev) =>
-              prev.map((v) => (v.id === updatedVenue.id ? { ...v, ...updatedVenue } : v))
+              prev.map((v) =>
+                v.id === updatedVenue.id
+                  ? {
+                      ...v,
+                      ...updatedVenue,
+                      facilities: updatedVenue.facilities || v.facilities || [],
+                      slots: updatedVenue.slots || v.slots || [],
+                    }
+                  : v
+              )
             );
           }}
         />
@@ -324,7 +337,7 @@ export default function Home() {
         </>
       )}
 
-      <footer className="border-t border-black/10 bg-white">
+      <footer className="border-t border-black/10 bg-[#f7f8f4]">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <button className="flex items-center gap-2 self-start" onClick={() => handleNavigate()}>
             <span className="grid h-8 w-8 place-items-center rounded-full bg-[#101310] text-[#d8ff3e]">
