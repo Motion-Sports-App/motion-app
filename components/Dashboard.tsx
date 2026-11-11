@@ -19,7 +19,7 @@ import { partnerService } from '@/lib/services/partnerService';
 import type { Booking } from '@/lib/services/bookingService';
 import type { Venue, OperatingHours } from '@/lib/data';
 
-const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
+import { money } from '@/lib/constants';
 
 const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',

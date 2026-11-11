@@ -3,10 +3,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { MapPin, Star, X } from 'lucide-react';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
-import { ALL_BOOKING_SLOTS, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
+import { ALL_BOOKING_SLOTS, DEFAULT_VENUE_IMAGE, money } from '@/lib/constants';
 import type { Venue } from '@/lib/data';
 
-const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
 const dateLabel = (d: Date) => {
   const year = d.getFullYear();

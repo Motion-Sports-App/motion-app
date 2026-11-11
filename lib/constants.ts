@@ -37,3 +37,9 @@ export const SPORTS_LIST: { name: Sport; icon: string }[] = [
   { name: 'Basketball', icon: '🏀' },
   { name: 'Futsal', icon: '⚽' },
 ];
+
+// lib/utils.ts
+export const money = (n?: number | null) => {
+  const val = Number(n);
+  return `฿${isNaN(val) ? 0 : val.toLocaleString('en-US')}`;
+};
