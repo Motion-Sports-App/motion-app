@@ -147,8 +147,14 @@ export default function Dashboard({
       if (res.success) {
         const updatedRecord = Array.isArray(res.data) ? res.data[0] : res.data;
         
+        const fullUpdatedVenue = {
+        ...selectedVenue,
+        ...matrixPayload,
+        ...(updatedRecord || {}),
+      };
+
         if (onVenueUpdate) {
-          onVenueUpdate(updatedRecord || { ...selectedVenue, ...matrixPayload });
+          onVenueUpdate(fullUpdatedVenue);
         }
         setIsEditingConfig(false);
       } else {

@@ -112,11 +112,14 @@ export default function Home() {
     return venues.filter((v) => {
       const sportMatch = activeSport === 'All sports' || v.sport === activeSport;
       const q = query.trim().toLowerCase();
+      
+      const facilitiesList = Array.isArray(v.facilities) ? v.facilities.join(' ') : '';
       const queryMatch =
-        !q || `${v.name} ${v.sport} ${v.area} ${(v.facilities || []).join(' ')}`.toLowerCase().includes(q);
+        !q || `${v.name || ''} ${v.sport || ''} ${v.area || ''} ${facilitiesList}`.toLowerCase().includes(q);
       const areaMatch =
-        area === 'Anywhere in Bangkok' || v.area.toLowerCase().includes(area.toLowerCase());
-      const priceMatch = maxPrice === 'Any price' || v.price <= Number(maxPrice);
+        area === 'Anywhere in Bangkok' || (v.area && v.area.toLowerCase().includes(area.toLowerCase()));
+      const priceMatch = maxPrice === 'Any price' || (v.price && v.price <= Number(maxPrice));
+      
       return sportMatch && queryMatch && areaMatch && priceMatch;
     });
   }, [venues, activeSport, query, area, maxPrice]);
