@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   ArrowLeft,
   Building2,
@@ -15,13 +15,12 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
-import { venueService } from '@/lib/services/venueService';
+import { partnerService } from '@/lib/services/partnerService';
 import type { Booking } from '@/lib/services/bookingService';
-import type { Venue } from '@/lib/data';
+import type { Venue, OperatingHours } from '@/lib/data';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 
-// 24-Hour Range
 const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -42,31 +41,58 @@ export default function Dashboard({
   venues: Venue[];
   onBack: () => void;
   onCancel: (id: string) => void;
-  onVenueUpdate?: (updatedVenue: Venue) => void;
+  onVenueUpdate?: (updatedVenue: any) => void;
 }) {
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0]
   );
-  const [selectedVenueId, setSelectedVenueId] = useState<string>(
-    venues[0]?.id || '1'
-  );
+  const [selectedVenueId, setSelectedVenueId] = useState<string>('');
 
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const selectedVenue = useMemo(
-    () => venues.find((v) => v.id === selectedVenueId) || venues[0],
-    [venues, selectedVenueId]
-  );
+  // Automatically pick the user's owned venue or fallback to first venue
+  const selectedVenue = useMemo(() => {
+    if (!venues || venues.length === 0) return null;
+    return (
+      venues.find((v) => v.id === selectedVenueId) ||
+      venues.find((v) => v.user_id === user?.id || (v as any).owner_id === user?.id) ||
+      venues[0]
+    );
+  }, [venues, selectedVenueId, user]);
 
-  const [totalCourts, setTotalCourts] = useState<number>(
-    selectedVenue?.total_courts || 6
-  );
-  const [openTime, setOpenTime] = useState('08:00');
-  const [closeTime, setCloseTime] = useState('22:00');
-
+  // Form State
+  const [totalCourts, setTotalCourts] = useState<number>(1);
+  const [openTime, setOpenTime] = useState<string>('08:00');
+  const [closeTime, setCloseTime] = useState<string>('22:00');
   const [blockedSlots, setBlockedSlots] = useState<Record<string, boolean>>({});
+
+  // SYNC local state whenever selected venue data changes or loads from Supabase
+  useEffect(() => {
+    if (selectedVenue) {
+      // 1. Sync Court Count safely
+      const courtCount = selectedVenue.total_courts ?? (selectedVenue as any).totalCourts ?? 1;
+      setTotalCourts(Number(courtCount) > 0 ? Number(courtCount) : 1);
+
+      // 2. Parse Operating Hours with explicit type narrowing
+      let parsedHours: OperatingHours | null = null;
+      const rawHours = selectedVenue.operating_hours;
+
+      if (typeof rawHours === 'string') {
+        try {
+          parsedHours = JSON.parse(rawHours);
+        } catch {
+          parsedHours = null;
+        }
+      } else if (rawHours && typeof rawHours === 'object') {
+        parsedHours = rawHours as OperatingHours;
+      }
+
+      setOpenTime(parsedHours?.open_time || '08:00');
+      setCloseTime(parsedHours?.close_time || '22:00');
+    }
+  }, [selectedVenue]);
 
   const stats = useMemo(() => {
     const active = bookings.filter((b) => b.status === 'Confirmed');
@@ -82,8 +108,8 @@ export default function Dashboard({
   }, [bookings, venues]);
 
   const activeHours = useMemo(() => {
-    const startHour = parseInt(openTime.split(':')[0], 10);
-    const endHour = parseInt(closeTime.split(':')[0], 10);
+    const startHour = parseInt(openTime.split(':')[0], 10) || 8;
+    const endHour = parseInt(closeTime.split(':')[0], 10) || 22;
     return DEFAULT_HOURS.filter((h) => {
       const hr = parseInt(h.split(':')[0], 10);
       return hr >= startHour && hr <= endHour;
@@ -99,26 +125,38 @@ export default function Dashboard({
   };
 
   const handleSaveConfig = async () => {
-    if (!selectedVenue?.id) return;
+    if (!selectedVenue?.id) {
+      alert('No venue selected to update.');
+      return;
+    }
+
     setIsSaving(true);
     try {
-      const updated = await venueService.updateConfig(
-        selectedVenue.id,
-        totalCourts,
-        openTime,
-        closeTime
-      );
-      
-      // Notify parent page of the updated venue numbers
-      if (onVenueUpdate && updated?.[0]) {
-        onVenueUpdate(updated[0]);
-      } else if (onVenueUpdate) {
-        onVenueUpdate({ ...selectedVenue, total_courts: totalCourts });
-      }
+      const matrixPayload = {
+        total_courts: Number(totalCourts),
+        operating_hours: {
+          open_time: openTime,
+          close_time: closeTime,
+          slot_duration_minutes: 60,
+        },
+      };
 
-      setIsEditingConfig(false);
-    } catch (err) {
+      // Call partnerService to write changes into Supabase
+      const res = await partnerService.updateVenueMatrix(selectedVenue.id, matrixPayload);
+
+      if (res.success) {
+        const updatedRecord = Array.isArray(res.data) ? res.data[0] : res.data;
+        
+        if (onVenueUpdate) {
+          onVenueUpdate(updatedRecord || { ...selectedVenue, ...matrixPayload });
+        }
+        setIsEditingConfig(false);
+      } else {
+        alert(`Supabase save error: ${res.error}`);
+      }
+    } catch (err: any) {
       console.error('Failed to update venue configuration:', err);
+      alert(`Save error: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -140,7 +178,7 @@ export default function Dashboard({
           </p>
           <h1 className="mt-1 text-4xl font-black tracking-[-.06em]">Control Centre</h1>
           <p className="mt-1 text-sm text-black/55">
-            Manage court reservations, active listings, and coaching schedules.
+            Managing <span className="font-bold text-black">{selectedVenue?.name || 'Venue'}</span>
           </p>
         </div>
 
@@ -262,11 +300,11 @@ export default function Dashboard({
               <input
                 type="number"
                 min={1}
-                max={20}
+                max={50}
                 disabled={!isEditingConfig}
                 value={totalCourts}
-                onChange={(e) => setTotalCourts(Number(e.target.value))}
-                className={`w-14 rounded border px-2 py-1 text-center font-bold outline-none ${
+                onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
+                className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
                   isEditingConfig
                     ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
                     : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'

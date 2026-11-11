@@ -1,5 +1,13 @@
 export type Sport = 'All sports' | 'Badminton' | 'Tennis' | 'Basketball' | 'Futsal';
 
+export interface OperatingHours {
+  open_time: string;
+  close_time: string;
+  slot_duration_minutes?: number;
+  days_open?: string[];
+  [key: string]: any;
+}
+
 export type Venue = {
   id: string;
   name: string;
@@ -10,6 +18,9 @@ export type Venue = {
   price: number;
   price_per_hour?: number;
   total_courts?: number;
+  user_id?: string;
+  owner_id?: string;
+  operating_hours?: OperatingHours | string;
   rating?: number;
   image?: string;
   image_url?: string;

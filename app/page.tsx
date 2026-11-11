@@ -93,11 +93,14 @@ export default function Home() {
     }
   }, [user]);
 
+  const loadVenues = async () => {
+    const data = await venueService.getAll();
+    setVenues(data || []);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    venueService.getAll().then((data) => {
-      setVenues(data);
-      setLoading(false);
-    });
+    loadVenues();
   }, []);
 
   const handleCancelBooking = async (id: string) => {
@@ -110,7 +113,7 @@ export default function Home() {
       const sportMatch = activeSport === 'All sports' || v.sport === activeSport;
       const q = query.trim().toLowerCase();
       const queryMatch =
-        !q || `${v.name} ${v.sport} ${v.area} ${v.facilities.join(' ')}`.toLowerCase().includes(q);
+        !q || `${v.name} ${v.sport} ${v.area} ${(v.facilities || []).join(' ')}`.toLowerCase().includes(q);
       const areaMatch =
         area === 'Anywhere in Bangkok' || v.area.toLowerCase().includes(area.toLowerCase());
       const priceMatch = maxPrice === 'Any price' || v.price <= Number(maxPrice);
@@ -169,9 +172,7 @@ export default function Home() {
         <MotionAdminCenter
           user={user}
           onBack={() => resetViews()}
-          onVenueApproved={() => {
-            venueService.getAll().then(setVenues);
-          }}
+          onVenueApproved={loadVenues}
         />
       ) : showPartnerOnboarding ? (
         <PartnerOnboardingView
@@ -385,7 +386,6 @@ export default function Home() {
               )}
             </div>
 
-            {/* ACTION BUTTONS */}
             <div className="mt-6 flex flex-col gap-2">
               <button 
                 onClick={() => {
