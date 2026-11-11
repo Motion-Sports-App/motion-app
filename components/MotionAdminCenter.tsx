@@ -38,7 +38,6 @@ export default function MotionAdminCenter({
   async function loadData() {
     setLoading(true);
     try {
-      // Fetch both datasets concurrently using Promise.all
       const [appsData, venuesData] = await Promise.all([
         partnerService.getPendingVenueApplications(),
         partnerService.getAllVenues(),
@@ -64,14 +63,25 @@ export default function MotionAdminCenter({
 
       if (res.success) {
         if (applicantEmail) {
-          await fetch('/api/send-approval-email', {
+          console.log('Sending approval email to:', applicantEmail);
+          
+          const emailRes = await fetch('/api/send-approval-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               email: applicantEmail,
               venueName: venueName || 'Your Venue',
             }),
-          }).catch((err) => console.error('Email notification failed:', err));
+          });
+
+          const emailData = await emailRes.json();
+          console.log('Email API Result:', emailData);
+
+          if (!emailRes.ok) {
+            alert(`Approved, but email dispatch failed: ${emailData.error}`);
+          }
+        } else {
+          alert('Approved venue, but no applicant email was found on this record to notify.');
         }
 
         onVenueApproved();
@@ -79,8 +89,9 @@ export default function MotionAdminCenter({
       } else {
         alert(res.error || 'Failed to approve application.');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error approving application:', err);
+      alert(`Approval error: ${err.message}`);
     } finally {
       setActionId(null);
     }
@@ -102,7 +113,6 @@ export default function MotionAdminCenter({
     try {
       const res = await partnerService.deleteVenueAndResetUser(venueId, ownerId);
       if (res.success) {
-        // Optimistically remove from state and refresh
         setVenues((prev) => prev.filter((v) => v.id !== venueId));
         await loadData();
       } else {
@@ -187,49 +197,58 @@ export default function MotionAdminCenter({
           <div className="p-12 text-center text-xs font-bold text-black/40">Loading data...</div>
         ) : activeTab === 'applications' ? (
           applications.length > 0 ? (
-            applications.map((app) => (
-              <div
-                key={app.id}
-                className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
-                      {app.sport}
-                    </span>
-                    <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-800">
-                      {app.status.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <h3 className="mt-1 text-xl font-black text-black">{app.name}</h3>
-                  <p className="text-xs text-black/60">
-                    {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
-                  </p>
-                  {app.applicant_email && (
-                    <p className="mt-1 text-[11px] font-semibold text-black/40">
-                      Applicant: {app.applicant_email}
-                    </p>
-                  )}
-                </div>
+            applications.map((app) => {
+              // Target email fallback resolution
+              const targetEmail = app.applicant_email || app.email || app.user_email;
 
-                <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
-                  <button
-                    disabled={actionId === app.id}
-                    onClick={() => handleApprove(app.id, app.applicant_email, app.name)}
-                    className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
-                  >
-                    {actionId === app.id ? 'Publishing...' : 'Approve & Publish'}
-                  </button>
-                  <button
-                    disabled={actionId === app.id}
-                    onClick={() => handleReject(app.id)}
-                    className="rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
-                  >
-                    Decline
-                  </button>
+              return (
+                <div
+                  key={app.id}
+                  className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
+                        {app.sport}
+                      </span>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[9px] font-black uppercase text-amber-800">
+                        {app.status ? app.status.replace('_', ' ') : 'PENDING'}
+                      </span>
+                    </div>
+                    <h3 className="mt-1 text-xl font-black text-black">{app.name}</h3>
+                    <p className="text-xs text-black/60">
+                      {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
+                    </p>
+                    {targetEmail ? (
+                      <p className="mt-1 text-[11px] font-semibold text-black/40">
+                        Applicant: {targetEmail}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[11px] font-semibold text-red-400">
+                        No email recorded on application
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 border-t border-black/10 pt-3 sm:border-0 sm:pt-0">
+                    <button
+                      disabled={actionId === app.id}
+                      onClick={() => handleApprove(app.id, targetEmail, app.name)}
+                      className="rounded-full bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
+                    >
+                      {actionId === app.id ? 'Publishing...' : 'Approve & Publish'}
+                    </button>
+                    <button
+                      disabled={actionId === app.id}
+                      onClick={() => handleReject(app.id)}
+                      className="rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                    >
+                      Decline
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           ) : (
             <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
               No pending venue applications found.

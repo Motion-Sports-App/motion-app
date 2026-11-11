@@ -20,6 +20,21 @@ export interface CoachApplicationData {
   venueId?: string;
 }
 
+export interface OperatingHours {
+  open_time: string;
+  close_time: string;
+  slot_duration_minutes?: number;
+  days_open?: string[];
+  [key: string]: any;
+}
+
+export interface MatrixData {
+  total_courts: number;
+  price?: number;
+  price_per_hour?: number;
+  operating_hours: OperatingHours;
+}
+
 export const partnerService = {
   async submitVenueApplication(userId: string, data: VenueApplicationData) {
     try {
@@ -90,7 +105,7 @@ export const partnerService = {
       if (error) throw error;
       return data || [];
     } catch (error) {
-      console.error('getPendingVenueApplications Error:', error);
+      console.error('getPendingVenueApplications error:', error);
       return [];
     }
   },
@@ -155,6 +170,22 @@ export const partnerService = {
     }
   },
 
+  async getVenueById(venueId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .select('*')
+        .eq('id', venueId)
+        .single();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('getVenueById Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
   // Completely delete a venue and reset the user's application state for re-testing
   async deleteVenueAndResetUser(venueId: string, ownerId?: string) {
     try {
@@ -172,6 +203,56 @@ export const partnerService = {
       return { success: true };
     } catch (error: any) {
       console.error('deleteVenueAndResetUser Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Updates Court quantity, Operating Hours matrix, and pricing
+  async updateVenueMatrix(venueId: string, matrixData: MatrixData) {
+    try {
+      const priceValue = matrixData.price_per_hour ?? matrixData.price;
+
+      const payload: Record<string, any> = {
+        total_courts: Number(matrixData.total_courts),
+        operating_hours: matrixData.operating_hours,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (priceValue !== undefined) {
+        payload.price_per_hour = Number(priceValue);
+        payload.price = Number(priceValue); // Fallback for both schema conventions
+      }
+
+      const { data, error } = await supabase
+        .from('venues')
+        .update(payload)
+        .eq('id', venueId)
+        .select();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('updateVenueMatrix Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // General venue profile update helper
+  async updateVenueDetails(venueId: string, updates: Record<string, any>) {
+    try {
+      const { data, error } = await supabase
+        .from('venues')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', venueId)
+        .select();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('updateVenueDetails Error:', error);
       return { success: false, error: error.message };
     }
   },
