@@ -146,7 +146,8 @@ export default function Dashboard({
           ...selectedVenue,
           facilities: selectedVenue.facilities || [],
           slots: selectedVenue.slots || [],
-          ...matrixPayload,
+          total_courts: Number(totalCourts),
+          operating_hours: matrixPayload.operating_hours,
           ...(dbRecord || {}),
         };
 

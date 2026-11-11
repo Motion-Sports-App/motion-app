@@ -7,6 +7,8 @@ import type { Venue } from '@/lib/data';
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 
 export default function VenueCard({ venue, onSelect }: { venue: Venue; onSelect: () => void }) {
+  const facilities = Array.isArray(venue?.facilities) ? venue.facilities : [];
+  const slots = Array.isArray(venue?.slots) ? venue.slots : [];
   return (
     <article className="group cursor-pointer" onClick={onSelect}>
       <div className="relative overflow-hidden rounded-2xl bg-[#e8ebdf]">
