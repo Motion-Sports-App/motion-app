@@ -144,10 +144,11 @@ export default function Dashboard({
         // Clean merge preserving existing fields like facilities & slots
         const mergedVenue: Venue = {
           ...selectedVenue,
+          price: selectedVenue.price ?? dbRecord?.price ?? dbRecord?.price_per_hour ?? 0,
+          price_per_hour: selectedVenue.price_per_hour ?? dbRecord?.price_per_hour ?? selectedVenue.price ?? 0,
           facilities: selectedVenue.facilities || [],
           slots: selectedVenue.slots || [],
-          total_courts: Number(totalCourts),
-          operating_hours: matrixPayload.operating_hours,
+          ...matrixPayload,
           ...(dbRecord || {}),
         };
 

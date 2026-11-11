@@ -28,7 +28,10 @@ import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 import MotionAdminCenter from '@/components/MotionAdminCenter';
 
-const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
+const money = (n?: number | null) => {
+  const val = Number(n);
+  return `฿${isNaN(val) ? 0 : val.toLocaleString('en-US')}`;
+};
 const today = new Date();
 const dateLabel = (d: Date) => {
   const year = d.getFullYear();
