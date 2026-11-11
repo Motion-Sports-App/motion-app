@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { venueService } from '@/lib/services/venueService';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
+import { partnerService } from '@/lib/services/partnerService';
 import { SPORTS_LIST, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
 import type { Sport, Venue } from '@/lib/data';
 
@@ -25,7 +26,7 @@ import VenueModal from '@/components/VenueModal';
 import UserBookingsView from '@/components/UserBookingsView';
 import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
-import MotionAdminCenter from '@/components/MotionAdminCenter'; // 👈 Imported
+import MotionAdminCenter from '@/components/MotionAdminCenter';
 
 const money = (n: number) => `฿${n.toLocaleString('en-US')}`;
 const today = new Date();
@@ -183,14 +184,6 @@ export default function Home() {
         <UserBookingsView
           user={user}
           bookings={bookings}
-          onBack={() => resetViews()}
-          onCancel={handleCancelBooking}
-        />
-      ) : showVenueAdmin ? (
-        <Dashboard
-          user={user}
-          bookings={bookings}
-          venues={venues}
           onBack={() => resetViews()}
           onCancel={handleCancelBooking}
         />
