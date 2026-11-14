@@ -14,6 +14,10 @@ import {
   Edit2,
   Check,
   Loader2,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
+  TrendingUp,
 } from 'lucide-react';
 import { partnerService } from '@/lib/services/partnerService';
 import type { Booking } from '@/lib/services/bookingService';
@@ -25,7 +29,7 @@ const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
   '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
-  '20:00', '21:00', '22:00', '23:00', '24:00'
+  '20:00', '21:00', '22:00', '23:00'
 ];
 
 export default function Dashboard({
@@ -51,6 +55,7 @@ export default function Dashboard({
 
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [showVenueStats, setShowVenueStats] = useState(false);
 
   const isSuperAdmin = useMemo(() => {
     return Boolean(
@@ -101,19 +106,6 @@ export default function Dashboard({
     }
   }, [selectedVenue]);
 
-  const stats = useMemo(() => {
-    const active = bookings.filter((b) => b.status === 'Confirmed');
-    const cancelled = bookings.filter((b) => b.status === 'Cancelled');
-    const totalRev = active.reduce((sum, b) => sum + b.price, 0);
-
-    return {
-      revenue: totalRev,
-      activeCount: active.length,
-      cancelCount: cancelled.length,
-      listings: ownedVenues.length,
-    };
-  }, [bookings, ownedVenues]);
-
   const activeHours = useMemo(() => {
     const startHour = parseInt(openTime.split(':')[0], 10) || 8;
     const endHour = parseInt(closeTime.split(':')[0], 10) || 22;
@@ -122,6 +114,33 @@ export default function Dashboard({
       return hr >= startHour && hr <= endHour;
     });
   }, [openTime, closeTime]);
+
+  const stats = useMemo(() => {
+    const venueBookings = selectedVenue
+      ? bookings.filter((b) => b.venue === selectedVenue.name)
+      : bookings;
+
+    const active = venueBookings.filter((b) => b.status === 'Confirmed');
+    const cancelled = venueBookings.filter((b) => b.status === 'Cancelled');
+    const totalRev = active.reduce((sum, b) => sum + b.price, 0);
+
+    const totalDailySlots = totalCourts * Math.max(activeHours.length, 1);
+    const blockedCount = Object.entries(blockedSlots).filter(
+      ([key, val]) => val && key.startsWith(`${selectedDate}_`)
+    ).length;
+    const occupancyRate =
+      totalDailySlots > 0
+        ? Math.min(100, Math.round((blockedCount / totalDailySlots) * 100))
+        : 0;
+
+    return {
+      revenue: totalRev,
+      activeCount: active.length,
+      cancelCount: cancelled.length,
+      listings: ownedVenues.length,
+      occupancyRate,
+    };
+  }, [bookings, selectedVenue, ownedVenues, totalCourts, activeHours, blockedSlots, selectedDate]);
 
   const toggleSlotStatus = (courtNum: number, time: string) => {
     const key = `${selectedDate}_C${courtNum}_${time}`;
@@ -244,188 +263,235 @@ export default function Dashboard({
         </div>
       </div>
 
-      <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-            <span>TOTAL REVENUE</span>
-            <DollarSign size={18} className="text-[#81971d]" />
-          </div>
-          <p className="mt-2 text-3xl font-black">{money(stats.revenue)}</p>
-        </div>
-
-        <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-            <span>ACTIVE BOOKINGS</span>
-            <CheckCircle2 size={18} className="text-green-600" />
-          </div>
-          <p className="mt-2 text-3xl font-black">{stats.activeCount}</p>
-        </div>
-
-        <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-            <span>CANCELLATIONS</span>
-            <XCircle size={18} className="text-red-500" />
-          </div>
-          <p className="mt-2 text-3xl font-black">{stats.cancelCount}</p>
-        </div>
-
-        <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-            <span>{activeRole === 'venue' ? 'VENUES LISTED' : 'CLIENT SESSIONS'}</span>
-            <Building2 size={18} className="text-black/50" />
-          </div>
-          <p className="mt-2 text-3xl font-black">{stats.listings}</p>
-        </div>
-      </div>
-
       {activeRole === 'venue' && (
         selectedVenue ? (
-          <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
-              <div>
-                <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
-                <p className="mt-1 text-xs text-black/50">
-                  Click slots to toggle status. White represents available, Red represents blocked/taken.
-                </p>
+          <>
+            {/* COURT & TIMESLOT MATRIX (TOP PRIORITY) */}
+            <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
+                  <p className="mt-1 text-xs text-black/50">
+                    Click slots to toggle status. White represents available, Red represents blocked/taken.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
+                    <Calendar size={15} />
+                    <input
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="bg-transparent outline-none"
+                    />
+                  </label>
+
+                  <button
+                    onClick={() => {
+                      if (isEditingConfig) {
+                        handleSaveConfig();
+                      } else {
+                        setIsEditingConfig(true);
+                      }
+                    }}
+                    disabled={isSaving}
+                    className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
+                      isEditingConfig
+                        ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
+                        : 'bg-[#101310] text-white hover:bg-black/80'
+                    }`}
+                  >
+                    {isSaving ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : isEditingConfig ? (
+                      <>
+                        <Check size={14} /> Save Config
+                      </>
+                    ) : (
+                      <>
+                        <Edit2 size={14} /> Edit Settings
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
-                  <Calendar size={15} />
+              <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
+                isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Sliders size={15} className="text-black/50" />
+                  <span>Courts Count:</span>
                   <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="bg-transparent outline-none"
+                    type="number"
+                    min={1}
+                    max={50}
+                    disabled={!isEditingConfig}
+                    value={totalCourts}
+                    onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
+                    className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
+                      isEditingConfig
+                        ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
+                        : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                    }`}
                   />
-                </label>
+                </div>
 
-                <button
-                  onClick={() => {
-                    if (isEditingConfig) {
-                      handleSaveConfig();
-                    } else {
-                      setIsEditingConfig(true);
-                    }
-                  }}
-                  disabled={isSaving}
-                  className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
-                    isEditingConfig
-                      ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
-                      : 'bg-[#101310] text-white hover:bg-black/80'
-                  }`}
-                >
-                  {isSaving ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : isEditingConfig ? (
-                    <>
-                      <Check size={14} /> Save Config
-                    </>
-                  ) : (
-                    <>
-                      <Edit2 size={14} /> Edit Settings
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
-              isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
-            }`}>
-              <div className="flex items-center gap-2">
-                <Sliders size={15} className="text-black/50" />
-                <span>Courts Count:</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  disabled={!isEditingConfig}
-                  value={totalCourts}
-                  onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
-                  className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
-                    isEditingConfig
-                      ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
-                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                  }`}
-                />
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Clock size={15} className="text-black/50" />
-                <span>Operating Hours:</span>
-                <select
-                  disabled={!isEditingConfig}
-                  value={openTime}
-                  onChange={(e) => setOpenTime(e.target.value)}
-                  className={`rounded-lg border px-2 py-1 outline-none ${
-                    isEditingConfig
-                      ? 'bg-white border-black/30'
-                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                  }`}
-                >
-                  {DEFAULT_HOURS.map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-                <span>to</span>
-                <select
-                  disabled={!isEditingConfig}
-                  value={closeTime}
-                  onChange={(e) => setCloseTime(e.target.value)}
-                  className={`rounded-lg border px-2 py-1 outline-none ${
-                    isEditingConfig
-                      ? 'bg-white border-black/30'
-                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                  }`}
-                >
-                  {DEFAULT_HOURS.map((h) => (
-                    <option key={h} value={h}>{h}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
-              <table className="w-full text-left border-collapse min-w-[600px]">
-                <thead>
-                  <tr className="bg-[#101310] text-white text-xs font-black uppercase">
-                    <th className="p-3 border-r border-white/10 w-28">Time</th>
-                    {Array.from({ length: totalCourts }).map((_, i) => (
-                      <th key={i} className="p-3 text-center border-r border-white/10">
-                        Court {i + 1}
-                      </th>
+                <div className="flex items-center gap-2">
+                  <Clock size={15} className="text-black/50" />
+                  <span>Operating Hours:</span>
+                  <select
+                    disabled={!isEditingConfig}
+                    value={openTime}
+                    onChange={(e) => setOpenTime(e.target.value)}
+                    className={`rounded-lg border px-2 py-1 outline-none ${
+                      isEditingConfig
+                        ? 'bg-white border-black/30'
+                        : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                    }`}
+                  >
+                    {DEFAULT_HOURS.map((h) => (
+                      <option key={h} value={h}>{h}</option>
                     ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/10 text-xs">
-                  {activeHours.map((time) => (
-                    <tr key={time} className="hover:bg-black/[0.01]">
-                      <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
-                        {time}
-                      </td>
-                      {Array.from({ length: totalCourts }).map((_, i) => {
-                        const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
-                        return (
-                          <td key={i} className="p-1.5 border-r border-black/10 text-center">
-                            <button
-                              onClick={() => toggleSlotStatus(i + 1, time)}
-                              title={isBlocked ? 'Blocked / Taken' : 'Available'}
-                              className={`h-9 w-full rounded-xl border transition shadow-2xs ${
-                                isBlocked
-                                  ? 'bg-red-500 border-red-600 hover:bg-red-600'
-                                  : 'bg-white border-black/15 hover:bg-[#eef7cf]'
-                              }`}
-                            />
-                          </td>
-                        );
-                      })}
+                  </select>
+                  <span>to</span>
+                  <select
+                    disabled={!isEditingConfig}
+                    value={closeTime}
+                    onChange={(e) => setCloseTime(e.target.value)}
+                    className={`rounded-lg border px-2 py-1 outline-none ${
+                      isEditingConfig
+                        ? 'bg-white border-black/30'
+                        : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                    }`}
+                  >
+                    {DEFAULT_HOURS.map((h) => (
+                      <option key={h} value={h}>{h}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
+                <table className="w-full text-left border-collapse min-w-[600px]">
+                  <thead>
+                    <tr className="bg-[#101310] text-white text-xs font-black uppercase">
+                      <th className="p-3 border-r border-white/10 w-28">Time</th>
+                      {Array.from({ length: totalCourts }).map((_, i) => (
+                        <th key={i} className="p-3 text-center border-r border-white/10">
+                          Court {i + 1}
+                        </th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/10 text-xs">
+                    {activeHours.map((time) => (
+                      <tr key={time} className="hover:bg-black/[0.01]">
+                        <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
+                          {time}
+                        </td>
+                        {Array.from({ length: totalCourts }).map((_, i) => {
+                          const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
+                          return (
+                            <td key={i} className="p-1.5 border-r border-black/10 text-center">
+                              <button
+                                onClick={() => toggleSlotStatus(i + 1, time)}
+                                title={isBlocked ? 'Blocked / Taken' : 'Available'}
+                                className={`h-9 w-full rounded-xl border transition shadow-2xs ${
+                                  isBlocked
+                                    ? 'bg-red-500 border-red-600 hover:bg-red-600'
+                                    : 'bg-white border-black/15 hover:bg-[#eef7cf]'
+                                }`}
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* COLLAPSIBLE VENUE STATISTICS */}
+            <div className="mt-6">
+              <button
+                type="button"
+                onClick={() => setShowVenueStats((prev) => !prev)}
+                className="flex w-full items-center justify-between rounded-2xl border border-black/10 bg-white px-6 py-4 text-left shadow-sm transition hover:border-black/25"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#eef7cf] text-[#586c12]">
+                    <BarChart3 size={18} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-black">
+                      {showVenueStats ? 'Hide Venue Statistics' : 'View More Venue Statistics'}
+                    </p>
+                    <p className="text-xs text-black/50">
+                      Revenue, bookings breakdown, cancellations & court utilization
+                    </p>
+                  </div>
+                </div>
+                {showVenueStats ? (
+                  <ChevronUp size={18} className="text-black/60" />
+                ) : (
+                  <ChevronDown size={18} className="text-black/60" />
+                )}
+              </button>
+
+              {showVenueStats && (
+                <div
+                  className={`mt-4 grid grid-cols-2 gap-4 ${
+                    isSuperAdmin ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
+                  }`}
+                >
+                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                      <span>TOTAL REVENUE</span>
+                      <DollarSign size={18} className="text-[#81971d]" />
+                    </div>
+                    <p className="mt-2 text-3xl font-black">{money(stats.revenue)}</p>
+                  </div>
+
+                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                      <span>ACTIVE BOOKINGS</span>
+                      <CheckCircle2 size={18} className="text-green-600" />
+                    </div>
+                    <p className="mt-2 text-3xl font-black">{stats.activeCount}</p>
+                  </div>
+
+                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                      <span>CANCELLATIONS</span>
+                      <XCircle size={18} className="text-red-500" />
+                    </div>
+                    <p className="mt-2 text-3xl font-black">{stats.cancelCount}</p>
+                  </div>
+
+                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                      <span>UTILIZATION ({selectedDate})</span>
+                      <TrendingUp size={18} className="text-[#81971d]" />
+                    </div>
+                    <p className="mt-2 text-3xl font-black">{stats.occupancyRate}%</p>
+                  </div>
+
+                  {isSuperAdmin && (
+                    <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+                      <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                        <span>VENUES LISTED</span>
+                        <Building2 size={18} className="text-black/50" />
+                      </div>
+                      <p className="mt-2 text-3xl font-black">{stats.listings}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
         ) : (
           <div className="mt-10 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
             <h2 className="text-xl font-black">No active venue found</h2>
@@ -434,6 +500,34 @@ export default function Dashboard({
             </p>
           </div>
         )
+      )}
+
+      {activeRole === 'coach' && (
+        <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
+          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+              <span>COACHING REVENUE</span>
+              <DollarSign size={18} className="text-[#81971d]" />
+            </div>
+            <p className="mt-2 text-3xl font-black">{money(stats.revenue)}</p>
+          </div>
+
+          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+              <span>CLIENT SESSIONS</span>
+              <CheckCircle2 size={18} className="text-green-600" />
+            </div>
+            <p className="mt-2 text-3xl font-black">{stats.activeCount}</p>
+          </div>
+
+          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+              <span>CANCELLATIONS</span>
+              <XCircle size={18} className="text-red-500" />
+            </div>
+            <p className="mt-2 text-3xl font-black">{stats.cancelCount}</p>
+          </div>
+        </div>
       )}
 
       <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
