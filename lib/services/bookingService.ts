@@ -112,9 +112,13 @@ export const bookingService = {
 
     const counts: Record<string, number> = {};
     (data || []).forEach((b: any) => {
-      const bookedQty = Math.max(1, Number(b.court_count || 1));
-      // Use time_slot first (fallback to booking_time) — never concatenate both to avoid double-counting
       const rawSlotStr = String(b.time_slot || b.booking_time || '');
+      const explicitCourts = extractExplicitCourts(rawSlotStr);
+      const bookedQty =
+        explicitCourts.length > 0
+          ? explicitCourts.length
+          : Math.max(1, Number(b.court_count || 1));
+
       const bookedStartTimes = extractSlotStartTimes(rawSlotStr);
 
       ALL_BOOKING_SLOTS.forEach((fullSlot) => {

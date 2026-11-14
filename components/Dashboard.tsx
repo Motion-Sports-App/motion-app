@@ -114,25 +114,23 @@ export default function Dashboard({
   const fetchVenueBookings = useCallback(async () => {
     if (!selectedVenue?.id && !selectedVenue?.name) return;
 
-    let query = supabase
+    const { data, error } = await supabase
       .from('bookings')
       .select('*')
       .order('created_at', { ascending: false });
 
-    if (selectedVenue.id && selectedVenue.name) {
-      query = query.or(
-        `venue_id.eq.${selectedVenue.id},venue_name.eq."${selectedVenue.name}"`
-      );
-    } else if (selectedVenue.id) {
-      query = query.eq('venue_id', selectedVenue.id);
-    } else {
-      query = query.eq('venue_name', selectedVenue.name);
-    }
-
-    const { data, error } = await query;
-
     if (!error && data) {
-      const mapped: DashboardBooking[] = data.map((b: any) => ({
+      const venueRows = data.filter((b: any) => {
+        if (b.venue_id && selectedVenue.id) {
+          return String(b.venue_id) === String(selectedVenue.id);
+        }
+        return (
+          String(b.venue_name || '').trim().toLowerCase() ===
+          String(selectedVenue.name || '').trim().toLowerCase()
+        );
+      });
+
+      const mapped: DashboardBooking[] = venueRows.map((b: any) => ({
         id: b.booking_code || String(b.id),
         dbId: String(b.id),
         venue: b.venue_name || selectedVenue.name || 'Court Booking',
@@ -140,7 +138,10 @@ export default function Dashboard({
         date: b.booking_date || b.date,
         time: b.time_slot || b.booking_time || '',
         price: Number(b.total_amount ?? b.price ?? 0),
-        status: b.status === 'Cancelled' ? 'Cancelled' : 'Confirmed',
+        status:
+          String(b.status || '').toLowerCase() === 'cancelled'
+            ? 'Cancelled'
+            : 'Confirmed',
         pointsEarned: b.points_earned || 0,
         customerName: b.customer_name || '',
         customerEmail: b.customer_email || '',

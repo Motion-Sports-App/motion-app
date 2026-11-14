@@ -187,6 +187,8 @@ export default function VenueModal({
     };
 
     setSubmitting(false);
+    const refreshedCounts = await bookingService.getOccupiedSlots(venue.id, date);
+    setSlotBookings(refreshedCounts);
     onBookSuccess(newBooking);
   }
 
