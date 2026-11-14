@@ -36,7 +36,7 @@ const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
   '14:00', '15:00', '16:00', '17:00', '18:00', '19:00',
-  '20:00', '21:00', '22:00', '23:00'
+  '20:00', '21:00', '22:00', '23:00',
 ];
 
 const getLocalTodayStr = () => {
@@ -196,6 +196,17 @@ export default function Dashboard({
       setCloseTime(parsedHours?.close_time || '22:00');
     }
   }, [selectedVenue]);
+
+  const handleOpenTimeChange = (newOpen: string) => {
+    setOpenTime(newOpen);
+    const newOpenHr = parseInt(newOpen.split(':')[0], 10);
+    const currentCloseHr = parseInt(closeTime.split(':')[0], 10);
+    if (closeTime !== '00:00' && currentCloseHr <= newOpenHr) {
+      const nextValidClose =
+        newOpenHr + 1 >= 24 ? '00:00' : `${String(newOpenHr + 1).padStart(2, '0')}:00`;
+      setCloseTime(nextValidClose);
+    }
+  };
 
   const activeHours = useMemo(() => {
     const startHour = parseInt(openTime.split(':')[0], 10);
@@ -440,6 +451,7 @@ export default function Dashboard({
     selectedVenue?.price_per_hour ?? selectedVenue?.price ?? 0
   );
   const totalSelectedAmount = selectedSlots.length * hourlyRate;
+  const openHourNum = parseInt(openTime.split(':')[0], 10);
 
   return (
     <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-6 lg:px-8 lg:py-8">
@@ -663,7 +675,7 @@ export default function Dashboard({
                     <select
                       disabled={!isEditingConfig}
                       value={openTime}
-                      onChange={(e) => setOpenTime(e.target.value)}
+                      onChange={(e) => handleOpenTimeChange(e.target.value)}
                       className={`rounded-lg border px-2 py-0.5 outline-none ${
                         isEditingConfig
                           ? 'bg-white border-black/30'
@@ -687,11 +699,15 @@ export default function Dashboard({
                           : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
                       }`}
                     >
-                      {DEFAULT_HOURS.map((h) => (
-                        <option key={h} value={h}>
-                          {h}
-                        </option>
-                      ))}
+                      {DEFAULT_HOURS.map((h) => {
+                        const hNum = parseInt(h.split(':')[0], 10);
+                        const isInvalidClose = h !== '00:00' && hNum <= openHourNum;
+                        return (
+                          <option key={h} value={h} disabled={isInvalidClose}>
+                            {h}
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                 </div>

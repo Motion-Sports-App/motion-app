@@ -51,17 +51,13 @@ export default function VenueModal({
       if (!venue.id) return;
       const { data, error } = await supabase
         .from('venues')
-        .select('operating_hours, total_courts, open_time, close_time')
+        .select('*')
         .eq('id', venue.id)
         .single();
 
       if (!error && data && active) {
         setLiveVenueConfig({
-          operating_hours:
-            data.operating_hours ??
-            (data.open_time || data.close_time
-              ? { open_time: data.open_time, close_time: data.close_time }
-              : undefined),
+          operating_hours: data.operating_hours,
           total_courts: data.total_courts ?? venue.total_courts,
         });
       }
@@ -391,7 +387,7 @@ export default function VenueModal({
               </div>
 
               <div className="max-h-40 overflow-y-auto grid grid-cols-2 gap-1.5 p-1 border border-black/10 rounded-xl bg-white">
-                {ALL_BOOKING_SLOTS.map((slot) => {
+                {availableSlots.map((slot) => {
                   const isSelected = selectedSlots.includes(slot);
                   const booked = slotBookings[slot] || 0;
                   const isFull = booked >= totalCourts;
