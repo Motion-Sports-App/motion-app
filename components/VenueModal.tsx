@@ -5,6 +5,7 @@ import { MapPin, Star, X } from 'lucide-react';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
 import { ALL_BOOKING_SLOTS, DEFAULT_VENUE_IMAGE, money } from '@/lib/constants';
 import type { Venue } from '@/lib/data';
+import { supabase } from '@/lib/supabase';
 
 const today = new Date();
 const dateLabel = (d: Date) => {
@@ -36,11 +37,91 @@ export default function VenueModal({
 
   const [slotBookings, setSlotBookings] = useState<Record<string, number>>({});
   const [loadingAvailability, setLoadingAvailability] = useState(true);
+  const [liveVenueConfig, setLiveVenueConfig] = useState<{
+    operating_hours?: any;
+    total_courts?: number;
+  }>({
+    operating_hours: (venue as any).operating_hours,
+    total_courts: venue.total_courts,
+  });
+
+  useEffect(() => {
+    let active = true;
+    async function fetchLatestVenueConfig() {
+      if (!venue.id) return;
+      const { data, error } = await supabase
+        .from('venues')
+        .select('operating_hours, total_courts, open_time, close_time')
+        .eq('id', venue.id)
+        .single();
+
+      if (!error && data && active) {
+        setLiveVenueConfig({
+          operating_hours:
+            data.operating_hours ??
+            (data.open_time || data.close_time
+              ? { open_time: data.open_time, close_time: data.close_time }
+              : undefined),
+          total_courts: data.total_courts ?? venue.total_courts,
+        });
+      }
+    }
+    fetchLatestVenueConfig();
+    return () => {
+      active = false;
+    };
+  }, [venue.id, venue.total_courts]);
 
   const [selectedSlots, setSelectedSlots] = useState<string[]>(['14:00 - 15:00']);
   const [courtCount, setCourtCount] = useState<number>(1);
 
-  const totalCourts = venue.total_courts || 4;
+  const totalCourts = liveVenueConfig.total_courts || venue.total_courts || 4;
+
+  const availableSlots = useMemo(() => {
+    const rawHours =
+      liveVenueConfig.operating_hours ?? (venue as any).operating_hours;
+
+    let openStr = (venue as any).open_time || '08:00';
+    let closeStr = (venue as any).close_time || '22:00';
+
+    if (typeof rawHours === 'string') {
+      const trimmed = rawHours.trim();
+      if (trimmed.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          openStr =
+            parsed.open_time || parsed.open || parsed.start || parsed.openTime || openStr;
+          closeStr =
+            parsed.close_time || parsed.close || parsed.end || parsed.closeTime || closeStr;
+        } catch {
+          // ignore malformed JSON
+        }
+      } else {
+        // Handle string format like "08:00 - 22:00"
+        const times = trimmed.match(/\d{1,2}:\d{2}/g);
+        if (times && times.length >= 2) {
+          openStr = times[0];
+          closeStr = times[1];
+        }
+      }
+    } else if (rawHours && typeof rawHours === 'object') {
+      openStr =
+        rawHours.open_time || rawHours.open || rawHours.start || rawHours.openTime || openStr;
+      closeStr =
+        rawHours.close_time || rawHours.close || rawHours.end || rawHours.closeTime || closeStr;
+    }
+
+    const openHour = parseInt(String(openStr).split(':')[0], 10);
+    const closeHour = parseInt(String(closeStr).split(':')[0], 10);
+
+    const safeOpen = isNaN(openHour) ? 8 : openHour;
+    const safeClose = isNaN(closeHour) ? 22 : closeHour === 0 ? 24 : closeHour;
+
+    return ALL_BOOKING_SLOTS.filter((slot) => {
+      const slotStartHour = parseInt(slot.split(':')[0], 10);
+      return slotStartHour >= safeOpen && slotStartHour < safeClose;
+    });
+  }, [liveVenueConfig.operating_hours, venue]);
 
   const mapSearchQuery = encodeURIComponent(
     venue.address || `${venue.name}, ${venue.area || 'Bangkok'}`
