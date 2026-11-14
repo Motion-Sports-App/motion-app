@@ -36,8 +36,56 @@ export interface MatrixData {
 }
 
 export const partnerService = {
+  async getUserApplicationStatuses(userId: string) {
+    try {
+      const [venueRes, coachRes] = await Promise.all([
+        supabase
+          .from('venue_applications')
+          .select('status')
+          .eq('user_id', userId)
+          .in('status', ['pending', 'pending_motion_approval', 'approved'])
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('coach_venue_affiliations')
+          .select('status')
+          .eq('coach_user_id', userId)
+          .in('status', ['pending', 'pending_venue_approval', 'approved'])
+          .order('created_at', { ascending: false })
+          .limit(1),
+      ]);
+
+      return {
+        venueStatus: venueRes.data?.[0]?.status || null,
+        coachStatus: coachRes.data?.[0]?.status || null,
+      };
+    } catch (error) {
+      console.error('getUserApplicationStatuses Error:', error);
+      return { venueStatus: null, coachStatus: null };
+    }
+  },
+
   async submitVenueApplication(userId: string, data: VenueApplicationData) {
     try {
+      // 1. Check if user already has a pending or approved venue application
+      const { data: existing, error: checkError } = await supabase
+        .from('venue_applications')
+        .select('id, status')
+        .eq('user_id', userId)
+        .in('status', ['pending', 'pending_motion_approval', 'approved'])
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existing && existing.length > 0) {
+        return {
+          success: false,
+          error: 'You already have an active or pending venue application.',
+          alreadyExists: true,
+          status: existing[0].status,
+        };
+      }
+
       const { data: userData } = await supabase.auth.getUser();
       const userEmail = userData.user?.email || '';
 
@@ -59,7 +107,17 @@ export const partnerService = {
         ])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          return {
+            success: false,
+            error: 'You already have an active or pending venue application.',
+            alreadyExists: true,
+          };
+        }
+        throw error;
+      }
+
       return { success: true, data: result };
     } catch (error: any) {
       console.error('submitVenueApplication Error:', error);
@@ -69,11 +127,29 @@ export const partnerService = {
 
   async submitCoachApplication(userId: string, data: CoachApplicationData) {
     try {
+      const { data: existing, error: checkError } = await supabase
+        .from('coach_venue_affiliations')
+        .select('id, status')
+        .eq('coach_user_id', userId)
+        .in('status', ['pending', 'pending_venue_approval', 'approved'])
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (existing && existing.length > 0) {
+        return {
+          success: false,
+          error: 'You already have an active or pending coach application.',
+          alreadyExists: true,
+          status: existing[0].status,
+        };
+      }
+
       const { data: result, error } = await supabase
-        .from('coach_applications')
+        .from('coach_venue_affiliations')
         .insert([
           {
-            user_id: userId,
+            coach_user_id: userId,
             coach_name: data.coachName,
             coach_email: data.coachEmail,
             sport: data.sport,
@@ -81,12 +157,22 @@ export const partnerService = {
             bio: data.bio,
             employment_type: data.employmentType,
             venue_id: data.venueId || null,
-            status: data.employmentType === 'freelance' ? 'approved' : 'pending',
+            status: data.employmentType === 'freelance' ? 'approved' : 'pending_venue_approval',
           },
         ])
         .select();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '23505') {
+          return {
+            success: false,
+            error: 'You already have an active or pending coach application.',
+            alreadyExists: true,
+          };
+        }
+        throw error;
+      }
+
       return { success: true, data: result };
     } catch (error: any) {
       console.error('submitCoachApplication Error:', error);
@@ -99,7 +185,7 @@ export const partnerService = {
       const { data, error } = await supabase
         .from('venue_applications')
         .select('*')
-        .eq('status', 'pending')
+        .in('status', ['pending', 'pending_motion_approval'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -186,7 +272,6 @@ export const partnerService = {
     }
   },
 
-  // Completely delete a venue and reset the user's application state for re-testing
   async deleteVenueAndResetUser(venueId: string, ownerId?: string) {
     try {
       const { data, error } = await supabase.rpc('delete_venue_and_reset_user', {
@@ -195,7 +280,7 @@ export const partnerService = {
       });
 
       if (error) throw error;
-      
+
       if (data && data.success === false) {
         throw new Error(data.error || 'Failed to delete venue');
       }
@@ -207,7 +292,6 @@ export const partnerService = {
     }
   },
 
-  // Updates Court quantity, Operating Hours matrix, and pricing
   async updateVenueMatrix(venueId: string, matrixData: MatrixData) {
     try {
       const priceValue = matrixData.price_per_hour ?? matrixData.price;
@@ -220,7 +304,7 @@ export const partnerService = {
 
       if (priceValue !== undefined) {
         payload.price_per_hour = Number(priceValue);
-        payload.price = Number(priceValue); // Fallback for both schema conventions
+        payload.price = Number(priceValue);
       }
 
       const { data, error } = await supabase
@@ -237,7 +321,6 @@ export const partnerService = {
     }
   },
 
-  // General venue profile update helper
   async updateVenueDetails(venueId: string, updates: Record<string, any>) {
     try {
       const { data, error } = await supabase

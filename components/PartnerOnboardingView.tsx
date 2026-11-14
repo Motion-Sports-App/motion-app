@@ -63,33 +63,24 @@ export default function PartnerOnboardingView({
     }
 
     setCheckingStatus(true);
-    try {
-      const [venueRes, coachRes] = await Promise.all([
-        supabase
-          .from('venue_applications')
-          .select('status')
-          .eq('user_id', user.id)
-          .in('status', ['pending_motion_approval', 'approved'])
-          .maybeSingle(),
-        supabase
-          .from('coach_venue_affiliations')
-          .select('status')
-          .eq('coach_user_id', user.id)
-          .in('status', ['pending_venue_approval', 'approved'])
-          .maybeSingle(),
-      ]);
+    const { venueStatus, coachStatus } =
+      await partnerService.getUserApplicationStatuses(user.id);
 
-      setVenueAppStatus(
-        (venueRes.data?.status as 'pending_motion_approval' | 'approved') || null
-      );
-      setCoachAppStatus(
-        (coachRes.data?.status as 'pending_venue_approval' | 'approved') || null
-      );
-    } catch (err) {
-      console.error('Error checking partner application statuses:', err);
-    } finally {
-      setCheckingStatus(false);
-    }
+    setVenueAppStatus(
+      venueStatus === 'approved'
+        ? 'approved'
+        : venueStatus
+        ? 'pending_motion_approval'
+        : null
+    );
+    setCoachAppStatus(
+      coachStatus === 'approved'
+        ? 'approved'
+        : coachStatus
+        ? 'pending_venue_approval'
+        : null
+    );
+    setCheckingStatus(false);
   }, [user?.id]);
 
   useEffect(() => {
@@ -136,9 +127,13 @@ export default function PartnerOnboardingView({
     setSubmitting(false);
 
     if (res.success) {
+      setVenueAppStatus('pending_motion_approval');
       await fetchApplicationStatuses();
       setSuccessMsg('Your venue application has been submitted! Motion will review and approve your listing shortly.');
       setMode('success');
+    } else if (res.error?.includes('unique_active_venue_application_per_user') || res.error?.includes('duplicate')) {
+      setVenueAppStatus('pending_motion_approval');
+      setErrorMsg('You already have a venue application under review.');
     } else {
       setErrorMsg(res.error || 'Failed to submit application.');
     }
@@ -175,6 +170,9 @@ export default function PartnerOnboardingView({
     setSubmitting(false);
 
     if (res.success) {
+      setCoachAppStatus(
+        coachData.employmentType === 'freelance' ? 'approved' : 'pending_venue_approval'
+      );
       await fetchApplicationStatuses();
       if (coachData.employmentType === 'freelance') {
         setSuccessMsg('Your freelance coach profile is live! Players can now find and book training sessions with you.');
@@ -184,6 +182,9 @@ export default function PartnerOnboardingView({
         );
       }
       setMode('success');
+    } else if (res.error?.includes('unique_active_coach_affiliation_per_user') || res.error?.includes('duplicate')) {
+      setCoachAppStatus('pending_venue_approval');
+      setErrorMsg('You already have an active or pending coach application.');
     } else {
       setErrorMsg(res.error || 'Failed to submit application.');
     }
