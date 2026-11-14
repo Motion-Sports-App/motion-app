@@ -104,6 +104,7 @@ export default function Home() {
     }));
     setVenues(safeData);
     setLoading(false);
+    return safeData;
   };
 
   useEffect(() => {
@@ -131,18 +132,19 @@ export default function Home() {
     });
   }, [venues, activeSport, query, area, maxPrice]);
 
-  const handleVenueAdminAccess = () => {
+  const handleVenueAdminAccess = async () => {
     resetViews();
+    const latestVenues = await loadVenues();
+
     const isSuperAdmin =
       user?.email &&
       ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com'].includes(user.email.toLowerCase());
 
-    const isApprovedVenue =
-      isSuperAdmin ||
-      user?.user_metadata?.role === 'venue_owner' ||
-      user?.user_metadata?.is_approved_venue === true;
+    const userHasActiveVenue =
+      Boolean(user?.id) &&
+      latestVenues.some((v) => v.user_id === user.id || v.owner_id === user.id);
 
-    if (isApprovedVenue) {
+    if (isSuperAdmin || userHasActiveVenue) {
       setShowVenueAdmin(true);
     } else {
       setShowPartnerOnboarding(true);

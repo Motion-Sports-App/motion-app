@@ -52,14 +52,26 @@ export default function Dashboard({
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const selectedVenue = useMemo(() => {
-    if (!venues || venues.length === 0) return null;
-    return (
-      venues.find((v) => v.id === selectedVenueId) ||
-      venues.find((v) => v.user_id === user?.id || v.owner_id === user?.id) ||
-      venues[0]
+  const isSuperAdmin = useMemo(() => {
+    return Boolean(
+      user?.email &&
+        ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com'].includes(
+          user.email.toLowerCase()
+        )
     );
-  }, [venues, selectedVenueId, user]);
+  }, [user]);
+
+  const ownedVenues = useMemo(() => {
+    if (!venues || venues.length === 0) return [];
+    if (isSuperAdmin) return venues;
+    if (!user?.id) return [];
+    return venues.filter((v) => v.user_id === user.id || v.owner_id === user.id);
+  }, [venues, user, isSuperAdmin]);
+
+  const selectedVenue = useMemo(() => {
+    if (ownedVenues.length === 0) return null;
+    return ownedVenues.find((v) => v.id === selectedVenueId) || ownedVenues[0];
+  }, [ownedVenues, selectedVenueId]);
 
   const [totalCourts, setTotalCourts] = useState<number>(1);
   const [openTime, setOpenTime] = useState<string>('08:00');
@@ -98,9 +110,9 @@ export default function Dashboard({
       revenue: totalRev,
       activeCount: active.length,
       cancelCount: cancelled.length,
-      listings: venues.length || 1,
+      listings: ownedVenues.length,
     };
-  }, [bookings, venues]);
+  }, [bookings, ownedVenues]);
 
   const activeHours = useMemo(() => {
     const startHour = parseInt(openTime.split(':')[0], 10) || 8;
@@ -141,7 +153,6 @@ export default function Dashboard({
       if (res.success) {
         const dbRecord = Array.isArray(res.data) ? res.data[0] : res.data;
 
-        // Clean merge preserving existing fields like facilities & slots
         const mergedVenue: Venue = {
           ...selectedVenue,
           price: selectedVenue.price ?? dbRecord?.price ?? dbRecord?.price_per_hour ?? 0,
@@ -183,31 +194,53 @@ export default function Dashboard({
           </p>
           <h1 className="mt-1 text-4xl font-black tracking-[-.06em]">Control Centre</h1>
           <p className="mt-1 text-sm text-black/55">
-            Managing <span className="font-bold text-black">{selectedVenue?.name || 'Venue'}</span>
+            Managing{' '}
+            <span className="font-bold text-black">
+              {selectedVenue?.name || 'No active venue assigned'}
+            </span>
           </p>
         </div>
 
-        <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
-          <button
-            onClick={() => setActiveRole('venue')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
-              activeRole === 'venue'
-                ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                : 'text-black/60 hover:text-black'
-            }`}
-          >
-            <Building2 size={15} /> Venue Owner
-          </button>
-          <button
-            onClick={() => setActiveRole('coach')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
-              activeRole === 'coach'
-                ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                : 'text-black/60 hover:text-black'
-            }`}
-          >
-            <UserCheck size={15} /> Coach Portal
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          {ownedVenues.length > 1 && (
+            <select
+              value={selectedVenue?.id || ''}
+              onChange={(e) => {
+                setSelectedVenueId(e.target.value);
+                setIsEditingConfig(false);
+              }}
+              className="rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-bold outline-none"
+            >
+              {ownedVenues.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
+            <button
+              onClick={() => setActiveRole('venue')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
+                activeRole === 'venue'
+                  ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
+                  : 'text-black/60 hover:text-black'
+              }`}
+            >
+              <Building2 size={15} /> Venue Owner
+            </button>
+            <button
+              onClick={() => setActiveRole('coach')}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
+                activeRole === 'coach'
+                  ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
+                  : 'text-black/60 hover:text-black'
+              }`}
+            >
+              <UserCheck size={15} /> Coach Portal
+            </button>
+          </div>
         </div>
       </div>
 
@@ -246,152 +279,161 @@ export default function Dashboard({
       </div>
 
       {activeRole === 'venue' && (
-        <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
-            <div>
-              <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
-              <p className="mt-1 text-xs text-black/50">
-                Click slots to toggle status. White represents available, Red represents blocked/taken.
-              </p>
+        selectedVenue ? (
+          <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
+                <p className="mt-1 text-xs text-black/50">
+                  Click slots to toggle status. White represents available, Red represents blocked/taken.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
+                  <Calendar size={15} />
+                  <input
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="bg-transparent outline-none"
+                  />
+                </label>
+
+                <button
+                  onClick={() => {
+                    if (isEditingConfig) {
+                      handleSaveConfig();
+                    } else {
+                      setIsEditingConfig(true);
+                    }
+                  }}
+                  disabled={isSaving}
+                  className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
+                    isEditingConfig
+                      ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
+                      : 'bg-[#101310] text-white hover:bg-black/80'
+                  }`}
+                >
+                  {isSaving ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : isEditingConfig ? (
+                    <>
+                      <Check size={14} /> Save Config
+                    </>
+                  ) : (
+                    <>
+                      <Edit2 size={14} /> Edit Settings
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
-                <Calendar size={15} />
+            <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
+              isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
+            }`}>
+              <div className="flex items-center gap-2">
+                <Sliders size={15} className="text-black/50" />
+                <span>Courts Count:</span>
                 <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="bg-transparent outline-none"
+                  type="number"
+                  min={1}
+                  max={50}
+                  disabled={!isEditingConfig}
+                  value={totalCourts}
+                  onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
+                  className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
+                    isEditingConfig
+                      ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
+                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                  }`}
                 />
-              </label>
+              </div>
 
-              <button
-                onClick={() => {
-                  if (isEditingConfig) {
-                    handleSaveConfig();
-                  } else {
-                    setIsEditingConfig(true);
-                  }
-                }}
-                disabled={isSaving}
-                className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
-                  isEditingConfig
-                    ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
-                    : 'bg-[#101310] text-white hover:bg-black/80'
-                }`}
-              >
-                {isSaving ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : isEditingConfig ? (
-                  <>
-                    <Check size={14} /> Save Config
-                  </>
-                ) : (
-                  <>
-                    <Edit2 size={14} /> Edit Settings
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
-            isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
-          }`}>
-            <div className="flex items-center gap-2">
-              <Sliders size={15} className="text-black/50" />
-              <span>Courts Count:</span>
-              <input
-                type="number"
-                min={1}
-                max={50}
-                disabled={!isEditingConfig}
-                value={totalCourts}
-                onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
-                className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
-                  isEditingConfig
-                    ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
-                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                }`}
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Clock size={15} className="text-black/50" />
-              <span>Operating Hours:</span>
-              <select
-                disabled={!isEditingConfig}
-                value={openTime}
-                onChange={(e) => setOpenTime(e.target.value)}
-                className={`rounded-lg border px-2 py-1 outline-none ${
-                  isEditingConfig
-                    ? 'bg-white border-black/30'
-                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                }`}
-              >
-                {DEFAULT_HOURS.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-              <span>to</span>
-              <select
-                disabled={!isEditingConfig}
-                value={closeTime}
-                onChange={(e) => setCloseTime(e.target.value)}
-                className={`rounded-lg border px-2 py-1 outline-none ${
-                  isEditingConfig
-                    ? 'bg-white border-black/30'
-                    : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
-                }`}
-              >
-                {DEFAULT_HOURS.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
-            <table className="w-full text-left border-collapse min-w-[600px]">
-              <thead>
-                <tr className="bg-[#101310] text-white text-xs font-black uppercase">
-                  <th className="p-3 border-r border-white/10 w-28">Time</th>
-                  {Array.from({ length: totalCourts }).map((_, i) => (
-                    <th key={i} className="p-3 text-center border-r border-white/10">
-                      Court {i + 1}
-                    </th>
+              <div className="flex items-center gap-2">
+                <Clock size={15} className="text-black/50" />
+                <span>Operating Hours:</span>
+                <select
+                  disabled={!isEditingConfig}
+                  value={openTime}
+                  onChange={(e) => setOpenTime(e.target.value)}
+                  className={`rounded-lg border px-2 py-1 outline-none ${
+                    isEditingConfig
+                      ? 'bg-white border-black/30'
+                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                  }`}
+                >
+                  {DEFAULT_HOURS.map((h) => (
+                    <option key={h} value={h}>{h}</option>
                   ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/10 text-xs">
-                {activeHours.map((time) => (
-                  <tr key={time} className="hover:bg-black/[0.01]">
-                    <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
-                      {time}
-                    </td>
-                    {Array.from({ length: totalCourts }).map((_, i) => {
-                      const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
-                      return (
-                        <td key={i} className="p-1.5 border-r border-black/10 text-center">
-                          <button
-                            onClick={() => toggleSlotStatus(i + 1, time)}
-                            title={isBlocked ? 'Blocked / Taken' : 'Available'}
-                            className={`h-9 w-full rounded-xl border transition shadow-2xs ${
-                              isBlocked
-                                ? 'bg-red-500 border-red-600 hover:bg-red-600'
-                                : 'bg-white border-black/15 hover:bg-[#eef7cf]'
-                            }`}
-                          />
-                        </td>
-                      );
-                    })}
+                </select>
+                <span>to</span>
+                <select
+                  disabled={!isEditingConfig}
+                  value={closeTime}
+                  onChange={(e) => setCloseTime(e.target.value)}
+                  className={`rounded-lg border px-2 py-1 outline-none ${
+                    isEditingConfig
+                      ? 'bg-white border-black/30'
+                      : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                  }`}
+                >
+                  {DEFAULT_HOURS.map((h) => (
+                    <option key={h} value={h}>{h}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
+              <table className="w-full text-left border-collapse min-w-[600px]">
+                <thead>
+                  <tr className="bg-[#101310] text-white text-xs font-black uppercase">
+                    <th className="p-3 border-r border-white/10 w-28">Time</th>
+                    {Array.from({ length: totalCourts }).map((_, i) => (
+                      <th key={i} className="p-3 text-center border-r border-white/10">
+                        Court {i + 1}
+                      </th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-black/10 text-xs">
+                  {activeHours.map((time) => (
+                    <tr key={time} className="hover:bg-black/[0.01]">
+                      <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
+                        {time}
+                      </td>
+                      {Array.from({ length: totalCourts }).map((_, i) => {
+                        const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
+                        return (
+                          <td key={i} className="p-1.5 border-r border-black/10 text-center">
+                            <button
+                              onClick={() => toggleSlotStatus(i + 1, time)}
+                              title={isBlocked ? 'Blocked / Taken' : 'Available'}
+                              className={`h-9 w-full rounded-xl border transition shadow-2xs ${
+                                isBlocked
+                                  ? 'bg-red-500 border-red-600 hover:bg-red-600'
+                                  : 'bg-white border-black/15 hover:bg-[#eef7cf]'
+                              }`}
+                            />
+                          </td>
+                        );
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="mt-10 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
+            <h2 className="text-xl font-black">No active venue found</h2>
+            <p className="mt-2 text-xs text-black/55">
+              This account is no longer linked to an active venue listing.
+            </p>
+          </div>
+        )
       )}
 
       <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
