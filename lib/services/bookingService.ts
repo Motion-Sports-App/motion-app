@@ -93,12 +93,19 @@ export const bookingService = {
       const bookedQty = Number(b.court_count || 1);
       const rawSlotStr = String(b.time_slot || b.booking_time || '');
 
-      // Extract the start time of the booking (e.g. "14:00" from "14:00 - 15:00 · Court 1")
-      const bookedStartTime = rawSlotStr.match(/^\s*(\d{2}:\d{2})/)?.[1] || rawSlotStr.split(' - ')[0].trim();
+      // Extract all start times in the booking (handles both single "14:00 - 15:00" and multi-slot "14:00 - 15:00, 15:00 - 16:00")
+      const bookedStartTimes = new Set<string>();
+      const rangeMatches = [...rawSlotStr.matchAll(/(\d{2}:\d{2})\s*-\s*\d{2}:\d{2}/g)];
+      if (rangeMatches.length > 0) {
+        rangeMatches.forEach((m) => bookedStartTimes.add(m[1]));
+      } else {
+        const singleMatch = rawSlotStr.match(/(\d{2}:\d{2})/);
+        if (singleMatch) bookedStartTimes.add(singleMatch[1]);
+      }
 
       ALL_BOOKING_SLOTS.forEach((fullSlot) => {
         const slotStartTime = fullSlot.split(' - ')[0].trim();
-        if (bookedStartTime === slotStartTime) {
+        if (bookedStartTimes.has(slotStartTime)) {
           counts[fullSlot] = (counts[fullSlot] || 0) + bookedQty;
         }
       });
@@ -111,26 +118,36 @@ export const bookingService = {
     const cleanDate = sanitizeDateStr(input.date);
     const maxCourts = Math.max(1, Number(input.totalCourts || 4));
     const requestedQty = Math.max(1, Number(input.courtCount || 1));
-    let finalTimeSlot = input.timeSlot;
 
-    // If no specific court number is attached yet (e.g. regular online booking modal),
-    // automatically assign the lowest available courts starting from Court 1, 2, ...
-    if (!/Court\s*\d+/i.test(finalTimeSlot)) {
-      const startTime = finalTimeSlot.match(/\d{2}:\d{2}/)?.[0] || finalTimeSlot;
+    // Split multi-slot selections (e.g. "14:00 - 15:00, 15:00 - 16:00") while preserving single-slot strings
+    const rawSlots = input.timeSlot.includes('· Court')
+      ? [input.timeSlot]
+      : input.timeSlot
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
 
-      const { data: existingBookings } = await supabase
-        .from('bookings')
-        .select('time_slot, booking_time, court_count')
-        .eq('venue_id', input.venueId)
-        .eq('booking_date', cleanDate)
-        .neq('status', 'Cancelled');
+    const { data: existingBookings } = await supabase
+      .from('bookings')
+      .select('time_slot, booking_time, court_count')
+      .eq('venue_id', input.venueId)
+      .eq('booking_date', cleanDate)
+      .neq('status', 'Cancelled');
 
+    const assignCourtsForSlot = (slotStr: string): string => {
+      if (/Court\s*\d+/i.test(slotStr)) return slotStr;
+
+      const startTime = slotStr.match(/(\d{2}:\d{2})/)?.[1] || slotStr;
       const occupiedCourts = new Set<number>();
       let legacyUnnumberedCount = 0;
 
       (existingBookings || []).forEach((b: any) => {
         const raw = String(b.time_slot || b.booking_time || '');
-        if (!raw.includes(startTime)) return;
+        const hasStart =
+          [...raw.matchAll(/(\d{2}:\d{2})\s*-\s*\d{2}:\d{2}/g)].some((m) => m[1] === startTime) ||
+          (!raw.includes('-') && raw.includes(startTime));
+
+        if (!hasStart) return;
 
         const explicit = extractExplicitCourts(raw);
         if (explicit.length > 0) {
@@ -140,7 +157,6 @@ export const bookingService = {
         }
       });
 
-      // Reserve lowest court numbers for any legacy unnumbered bookings first
       for (let i = 0; i < legacyUnnumberedCount; i++) {
         for (let c = 1; c <= maxCourts; c++) {
           if (!occupiedCourts.has(c)) {
@@ -150,7 +166,6 @@ export const bookingService = {
         }
       }
 
-      // Pick lowest open courts (Court 1, 2, ...) for this user's booking
       const assignedCourts: number[] = [];
       for (let c = 1; c <= maxCourts && assignedCourts.length < requestedQty; c++) {
         if (!occupiedCourts.has(c)) {
@@ -159,15 +174,46 @@ export const bookingService = {
         }
       }
 
-      if (assignedCourts.length > 0) {
-        const courtLabel =
-          assignedCourts.length === 1
-            ? `Court ${assignedCourts[0]}`
-            : `Courts ${assignedCourts.join(', ')}`;
-        finalTimeSlot = `${finalTimeSlot} · ${courtLabel}`;
+      if (assignedCourts.length === 0) return slotStr;
+      const courtLabel =
+        assignedCourts.length === 1
+          ? `Court ${assignedCourts[0]}`
+          : `Courts ${assignedCourts.join(', ')}`;
+      return `${slotStr} · ${courtLabel}`;
+    };
+
+    // If multiple slots were selected in the modal, create a booking row per slot so each hour tracks its own court assignment cleanly
+    if (rawSlots.length > 1) {
+      const perSlotPrice = Math.round((Number(input.totalPrice || 0) / rawSlots.length) * 100) / 100;
+      const results = [];
+
+      for (const slot of rawSlots) {
+        const enrichedSlot = assignCourtsForSlot(slot);
+        const { data, error } = await supabase.rpc('create_court_booking', {
+          p_venue_id: input.venueId,
+          p_venue_name: input.venueName,
+          p_sport: input.sport,
+          p_booking_date: cleanDate,
+          p_time_slot: enrichedSlot,
+          p_court_count: requestedQty,
+          p_price: perSlotPrice,
+          p_customer_name: input.customerName,
+          p_customer_email: input.customerEmail,
+          p_total_courts: maxCourts,
+        });
+
+        if (error) {
+          console.error('RPC Multi-Slot Booking Error:', error);
+          return { success: false, error: error.message };
+        }
+        results.push(data);
       }
+
+      return { success: true, data: results };
     }
 
+    // Single-slot booking
+    const finalTimeSlot = assignCourtsForSlot(rawSlots[0] || input.timeSlot);
     const { data, error } = await supabase.rpc('create_court_booking', {
       p_venue_id: input.venueId,
       p_venue_name: input.venueName,
