@@ -7,6 +7,7 @@ import { partnerService } from '@/lib/services/partnerService';
 const MOTION_EMPLOYEE_EMAILS = [
   'mingtan0403@gmail.com',
   'motionsportsapp@gmail.com',
+  'kvorakijkamjorn@gmail.com'
 ];
 
 export default function MotionAdminCenter({
