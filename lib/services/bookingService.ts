@@ -93,9 +93,12 @@ export const bookingService = {
       const bookedQty = Number(b.court_count || 1);
       const rawSlotStr = String(b.time_slot || b.booking_time || '');
 
+      // Extract the start time of the booking (e.g. "14:00" from "14:00 - 15:00 · Court 1")
+      const bookedStartTime = rawSlotStr.match(/^\s*(\d{2}:\d{2})/)?.[1] || rawSlotStr.split(' - ')[0].trim();
+
       ALL_BOOKING_SLOTS.forEach((fullSlot) => {
-        const startTime = fullSlot.split(' - ')[0];
-        if (rawSlotStr.includes(fullSlot) || rawSlotStr.includes(startTime)) {
+        const slotStartTime = fullSlot.split(' - ')[0].trim();
+        if (bookedStartTime === slotStartTime) {
           counts[fullSlot] = (counts[fullSlot] || 0) + bookedQty;
         }
       });

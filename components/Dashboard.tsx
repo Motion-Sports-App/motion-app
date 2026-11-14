@@ -39,6 +39,14 @@ const DEFAULT_HOURS = [
   '20:00', '21:00', '22:00', '23:00'
 ];
 
+const getLocalTodayStr = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 // Format "08:00" -> "08:00 - 09:00" to stay compatible with ALL_BOOKING_SLOTS in bookingService
 const toFullSlotLabel = (startHourStr: string) => {
   const hr = parseInt(startHourStr.split(':')[0], 10);
@@ -62,9 +70,7 @@ export default function Dashboard({
   onVenueUpdate?: (updatedVenue: Venue) => void;
 }) {
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDate, setSelectedDate] = useState<string>(() => getLocalTodayStr());
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
 
   const [isEditingConfig, setIsEditingConfig] = useState(false);
@@ -153,6 +159,19 @@ export default function Dashboard({
   const [totalCourts, setTotalCourts] = useState<number>(1);
   const [openTime, setOpenTime] = useState<string>('08:00');
   const [closeTime, setCloseTime] = useState<string>('22:00');
+
+  useEffect(() => {
+    let currentDay = getLocalTodayStr();
+    const interval = setInterval(() => {
+      const latestDay = getLocalTodayStr();
+      if (latestDay !== currentDay) {
+        setSelectedDate((prev) => (prev === currentDay ? latestDay : prev));
+        currentDay = latestDay;
+      }
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (selectedVenue) {
