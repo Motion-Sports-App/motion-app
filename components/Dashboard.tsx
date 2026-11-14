@@ -198,11 +198,14 @@ export default function Dashboard({
   }, [selectedVenue]);
 
   const activeHours = useMemo(() => {
-    const startHour = parseInt(openTime.split(':')[0], 10) || 8;
-    const endHour = parseInt(closeTime.split(':')[0], 10) || 22;
+    const startHour = parseInt(openTime.split(':')[0], 10);
+    const rawEndHour = parseInt(closeTime.split(':')[0], 10);
+    const safeStart = isNaN(startHour) ? 8 : startHour;
+    const safeEnd = isNaN(rawEndHour) ? 22 : rawEndHour === 0 ? 24 : rawEndHour;
+
     return DEFAULT_HOURS.filter((h) => {
       const hr = parseInt(h.split(':')[0], 10);
-      return hr >= startHour && hr <= endHour;
+      return hr >= safeStart && hr < safeEnd;
     });
   }, [openTime, closeTime]);
 
