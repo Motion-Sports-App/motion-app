@@ -251,12 +251,12 @@ export default function Dashboard({
       {activeRole === 'venue' && (
         selectedVenue ? (
           <>
-            {/* COURT & TIMESLOT MATRIX */}
-            <div className="mt-6 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
+            {/* COMPACT COURT & TIMESLOT MATRIX */}
+            <div className="mt-5 rounded-3xl border border-black/10 bg-white p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-4">
                 <div>
-                  <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
-                  <p className="mt-1 text-xs text-black/50">
+                  <h2 className="text-xl font-black tracking-tight">Court & Timeslot Matrix</h2>
+                  <p className="mt-0.5 text-xs text-black/50">
                     Click slots to toggle status. White represents available, Red represents blocked/taken.
                   </p>
                 </div>
@@ -302,11 +302,11 @@ export default function Dashboard({
                 </div>
               </div>
 
-              <div className={`mt-4 flex flex-wrap items-center gap-6 rounded-2xl p-3 text-xs font-bold transition ${
+              <div className={`mt-3 flex flex-wrap items-center gap-6 rounded-xl px-3 py-2 text-xs font-bold transition ${
                 isEditingConfig ? 'bg-[#f0f7db] border border-[#d0e588]' : 'bg-[#f7f8f4]'
               }`}>
                 <div className="flex items-center gap-2">
-                  <Sliders size={15} className="text-black/50" />
+                  <Sliders size={14} className="text-black/50" />
                   <span>Courts Count:</span>
                   <input
                     type="number"
@@ -315,7 +315,7 @@ export default function Dashboard({
                     disabled={!isEditingConfig}
                     value={totalCourts}
                     onChange={(e) => setTotalCourts(Math.max(1, Number(e.target.value)))}
-                    className={`w-16 rounded border px-2 py-1 text-center font-bold outline-none ${
+                    className={`w-14 rounded border px-2 py-0.5 text-center font-bold outline-none ${
                       isEditingConfig
                         ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
                         : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
@@ -324,13 +324,13 @@ export default function Dashboard({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <Clock size={15} className="text-black/50" />
+                  <Clock size={14} className="text-black/50" />
                   <span>Operating Hours:</span>
                   <select
                     disabled={!isEditingConfig}
                     value={openTime}
                     onChange={(e) => setOpenTime(e.target.value)}
-                    className={`rounded-lg border px-2 py-1 outline-none ${
+                    className={`rounded-lg border px-2 py-0.5 outline-none ${
                       isEditingConfig
                         ? 'bg-white border-black/30'
                         : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
@@ -345,7 +345,7 @@ export default function Dashboard({
                     disabled={!isEditingConfig}
                     value={closeTime}
                     onChange={(e) => setCloseTime(e.target.value)}
-                    className={`rounded-lg border px-2 py-1 outline-none ${
+                    className={`rounded-lg border px-2 py-0.5 outline-none ${
                       isEditingConfig
                         ? 'bg-white border-black/30'
                         : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
@@ -358,13 +358,13 @@ export default function Dashboard({
                 </div>
               </div>
 
-              <div className="mt-6 overflow-x-auto rounded-2xl border border-black/10">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-black/15">
                 <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
-                    <tr className="bg-[#101310] text-white text-xs font-black uppercase">
-                      <th className="p-3 border-r border-white/10 w-28">Time</th>
+                    <tr className="bg-[#101310] text-white text-[11px] font-black uppercase">
+                      <th className="px-3 py-2 border-r border-white/10 w-24">Time</th>
                       {Array.from({ length: totalCourts }).map((_, i) => (
-                        <th key={i} className="p-3 text-center border-r border-white/10">
+                        <th key={i} className="px-2 py-2 text-center border-r border-white/10 last:border-r-0">
                           Court {i + 1}
                         </th>
                       ))}
@@ -372,21 +372,25 @@ export default function Dashboard({
                   </thead>
                   <tbody className="divide-y divide-black/10 text-xs">
                     {activeHours.map((time) => (
-                      <tr key={time} className="hover:bg-black/[0.01]">
-                        <td className="p-3 font-extrabold bg-[#f7f8f4] border-r border-black/10">
+                      <tr key={time}>
+                        <td className="px-3 py-1 font-extrabold bg-[#f7f8f4] border-r border-black/10">
                           {time}
                         </td>
                         {Array.from({ length: totalCourts }).map((_, i) => {
                           const isBlocked = blockedSlots[`${selectedDate}_C${i + 1}_${time}`];
                           return (
-                            <td key={i} className="p-1.5 border-r border-black/10 text-center">
+                            <td
+                              key={i}
+                              className="p-0 border-r border-black/10 last:border-r-0"
+                            >
                               <button
+                                type="button"
                                 onClick={() => toggleSlotStatus(i + 1, time)}
                                 title={isBlocked ? 'Blocked / Taken' : 'Available'}
-                                className={`h-9 w-full rounded-xl border transition shadow-2xs ${
+                                className={`block h-7 w-full transition-colors ${
                                   isBlocked
-                                    ? 'bg-red-500 border-red-600 hover:bg-red-600'
-                                    : 'bg-white border-black/15 hover:bg-[#eef7cf]'
+                                    ? 'bg-red-500 hover:bg-red-600'
+                                    : 'bg-white hover:bg-[#eef7cf]'
                                 }`}
                               />
                             </td>
@@ -400,7 +404,7 @@ export default function Dashboard({
             </div>
 
             {/* COLLAPSIBLE VENUE STATISTICS */}
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 type="button"
                 onClick={() => setShowVenueStats((prev) => !prev)}
@@ -515,7 +519,7 @@ export default function Dashboard({
         </div>
       )}
 
-      <div className="mt-10 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+      <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
         <h2 className="text-2xl font-black tracking-tight">Master Reservation List</h2>
         <p className="mt-1 text-xs text-black/50">
           Showing active player bookings associated with your account.
