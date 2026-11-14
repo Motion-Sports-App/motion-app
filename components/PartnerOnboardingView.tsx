@@ -1,7 +1,15 @@
 'use client';
 
-import { useState } from 'react';
-import { ArrowLeft, Building2, CheckCircle2, UserCheck, ShieldAlert, Sparkles } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import {
+  ArrowLeft,
+  Building2,
+  CheckCircle2,
+  UserCheck,
+  ShieldAlert,
+  Clock,
+} from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
 import type { Venue } from '@/lib/data';
 
@@ -20,6 +28,11 @@ export default function PartnerOnboardingView({
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+
+  // Existing application status states
+  const [venueAppStatus, setVenueAppStatus] = useState<'pending_motion_approval' | 'approved' | null>(null);
+  const [coachAppStatus, setCoachAppStatus] = useState<'pending_venue_approval' | 'approved' | null>(null);
+  const [checkingStatus, setCheckingStatus] = useState(true);
 
   // Venue Form
   const [venueData, setVenueData] = useState({
@@ -40,6 +53,51 @@ export default function PartnerOnboardingView({
     bio: '',
     venueId: venues[0]?.id || '',
   });
+
+  const fetchApplicationStatuses = useCallback(async () => {
+    if (!user?.id) {
+      setVenueAppStatus(null);
+      setCoachAppStatus(null);
+      setCheckingStatus(false);
+      return;
+    }
+
+    setCheckingStatus(true);
+    try {
+      const [venueRes, coachRes] = await Promise.all([
+        supabase
+          .from('venue_applications')
+          .select('status')
+          .eq('user_id', user.id)
+          .in('status', ['pending_motion_approval', 'approved'])
+          .maybeSingle(),
+        supabase
+          .from('coach_venue_affiliations')
+          .select('status')
+          .eq('coach_user_id', user.id)
+          .in('status', ['pending_venue_approval', 'approved'])
+          .maybeSingle(),
+      ]);
+
+      setVenueAppStatus(
+        (venueRes.data?.status as 'pending_motion_approval' | 'approved') || null
+      );
+      setCoachAppStatus(
+        (coachRes.data?.status as 'pending_venue_approval' | 'approved') || null
+      );
+    } catch (err) {
+      console.error('Error checking partner application statuses:', err);
+    } finally {
+      setCheckingStatus(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchApplicationStatuses();
+  }, [fetchApplicationStatuses]);
+
+  const isVenueLocked = Boolean(venueAppStatus);
+  const isCoachLocked = Boolean(coachAppStatus);
 
   if (!user) {
     return (
@@ -66,6 +124,11 @@ export default function PartnerOnboardingView({
 
   const handleVenueSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isVenueLocked) {
+      setErrorMsg('You already have an active or pending venue application.');
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg('');
 
@@ -73,6 +136,7 @@ export default function PartnerOnboardingView({
     setSubmitting(false);
 
     if (res.success) {
+      await fetchApplicationStatuses();
       setSuccessMsg('Your venue application has been submitted! Motion will review and approve your listing shortly.');
       setMode('success');
     } else {
@@ -82,6 +146,11 @@ export default function PartnerOnboardingView({
 
   const handleCoachSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCoachLocked) {
+      setErrorMsg('You already have an active or pending coach application.');
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg('');
 
@@ -106,6 +175,7 @@ export default function PartnerOnboardingView({
     setSubmitting(false);
 
     if (res.success) {
+      await fetchApplicationStatuses();
       if (coachData.employmentType === 'freelance') {
         setSuccessMsg('Your freelance coach profile is live! Players can now find and book training sessions with you.');
       } else {
@@ -132,36 +202,110 @@ export default function PartnerOnboardingView({
           <p className="mt-1 text-sm text-black/55">Choose how you want to partner with Motion.</p>
 
           <div className="mt-8 grid gap-6 sm:grid-cols-2">
+            {/* VENUE APPLICATION CARD */}
             <div
-              onClick={() => setMode('venue_form')}
-              className="group cursor-pointer rounded-3xl border border-black/10 bg-white p-8 transition hover:border-black/30 hover:shadow-xl"
+              onClick={() => {
+                if (!checkingStatus && !isVenueLocked) {
+                  setErrorMsg('');
+                  setMode('venue_form');
+                }
+              }}
+              className={`group rounded-3xl border p-8 transition ${
+                isVenueLocked
+                  ? 'cursor-not-allowed border-black/10 bg-[#f7f8f4]/80 opacity-80'
+                  : 'cursor-pointer border-black/10 bg-white hover:border-black/30 hover:shadow-xl'
+              }`}
             >
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#eef7cf] text-[#586c12] group-hover:bg-[#d8ff3e]">
+              <div
+                className={`grid h-12 w-12 place-items-center rounded-2xl ${
+                  isVenueLocked
+                    ? 'bg-black/10 text-black/50'
+                    : 'bg-[#eef7cf] text-[#586c12] group-hover:bg-[#d8ff3e]'
+                }`}
+              >
                 <Building2 size={24} />
               </div>
-              <h2 className="mt-5 text-2xl font-black text-black">Register a Venue</h2>
+              <h2 className="mt-5 text-2xl font-black text-black">
+                {venueAppStatus === 'approved'
+                  ? 'Venue Registered'
+                  : venueAppStatus === 'pending_motion_approval'
+                  ? 'Venue Request Sent'
+                  : 'Register a Venue'}
+              </h2>
               <p className="mt-2 text-xs leading-5 text-black/60">
                 List your courts, set custom time slots, track bookings, and automate reservation schedules.
               </p>
-              <span className="mt-6 inline-block text-xs font-black text-[#586c12] group-hover:underline">
-                Apply as Venue Owner ↗
-              </span>
+
+              {checkingStatus ? (
+                <span className="mt-6 inline-block text-xs font-bold text-black/40">
+                  Checking status...
+                </span>
+              ) : venueAppStatus === 'approved' ? (
+                <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#586c12]">
+                  <CheckCircle2 size={15} /> Venue Application Approved
+                </span>
+              ) : venueAppStatus === 'pending_motion_approval' ? (
+                <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#81971d]">
+                  <Clock size={15} /> Pending Motion Approval
+                </span>
+              ) : (
+                <span className="mt-6 inline-block text-xs font-black text-[#586c12] group-hover:underline">
+                  Apply as Venue Owner ↗
+                </span>
+              )}
             </div>
 
+            {/* COACH APPLICATION CARD */}
             <div
-              onClick={() => setMode('coach_form')}
-              className="group cursor-pointer rounded-3xl border border-black/10 bg-white p-8 transition hover:border-black/30 hover:shadow-xl"
+              onClick={() => {
+                if (!checkingStatus && !isCoachLocked) {
+                  setErrorMsg('');
+                  setMode('coach_form');
+                }
+              }}
+              className={`group rounded-3xl border p-8 transition ${
+                isCoachLocked
+                  ? 'cursor-not-allowed border-black/10 bg-[#f7f8f4]/80 opacity-80'
+                  : 'cursor-pointer border-black/10 bg-white hover:border-black/30 hover:shadow-xl'
+              }`}
             >
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#101310] text-[#d8ff3e]">
+              <div
+                className={`grid h-12 w-12 place-items-center rounded-2xl ${
+                  isCoachLocked
+                    ? 'bg-black/10 text-black/50'
+                    : 'bg-[#101310] text-[#d8ff3e]'
+                }`}
+              >
                 <UserCheck size={24} />
               </div>
-              <h2 className="mt-5 text-2xl font-black text-black">Register as a Coach</h2>
+              <h2 className="mt-5 text-2xl font-black text-black">
+                {coachAppStatus === 'approved'
+                  ? 'Coach Account Active'
+                  : coachAppStatus === 'pending_venue_approval'
+                  ? 'Coach Request Sent'
+                  : 'Register as a Coach'}
+              </h2>
               <p className="mt-2 text-xs leading-5 text-black/60">
                 Register as a freelance coach or affiliate with a partner venue to receive client training sessions.
               </p>
-              <span className="mt-6 inline-block text-xs font-black text-black group-hover:underline">
-                Apply as Coach (Freelance or Venue) ↗
-              </span>
+
+              {checkingStatus ? (
+                <span className="mt-6 inline-block text-xs font-bold text-black/40">
+                  Checking status...
+                </span>
+              ) : coachAppStatus === 'approved' ? (
+                <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#586c12]">
+                  <CheckCircle2 size={15} /> Coach Profile Active
+                </span>
+              ) : coachAppStatus === 'pending_venue_approval' ? (
+                <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#81971d]">
+                  <Clock size={15} /> Pending Venue Approval
+                </span>
+              ) : (
+                <span className="mt-6 inline-block text-xs font-black text-black group-hover:underline">
+                  Apply as Coach (Freelance or Venue) ↗
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -276,8 +420,8 @@ export default function PartnerOnboardingView({
               </button>
               <button
                 type="submit"
-                disabled={submitting}
-                className="flex-1 rounded-full bg-[#d8ff3e] py-3 text-xs font-black text-black hover:bg-[#c9f02e]"
+                disabled={submitting || isVenueLocked}
+                className="flex-1 rounded-full bg-[#d8ff3e] py-3 text-xs font-black text-black hover:bg-[#c9f02e] disabled:opacity-50"
               >
                 {submitting ? 'Submitting Application...' : 'Submit Venue for Review'}
               </button>
@@ -394,8 +538,8 @@ export default function PartnerOnboardingView({
               </button>
               <button
                 type="submit"
-                disabled={submitting}
-                className="flex-1 rounded-full bg-[#101310] py-3 text-xs font-black text-white hover:bg-[#30372a]"
+                disabled={submitting || isCoachLocked}
+                className="flex-1 rounded-full bg-[#101310] py-3 text-xs font-black text-white hover:bg-[#30372a] disabled:opacity-50"
               >
                 {submitting
                   ? 'Registering...'
