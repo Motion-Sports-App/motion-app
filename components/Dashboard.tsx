@@ -128,6 +128,7 @@ export default function Dashboard({
     if (!error && data) {
       const mapped: DashboardBooking[] = data.map((b: any) => ({
         id: b.booking_code || String(b.id),
+        dbId: String(b.id),
         venue: b.venue_name || selectedVenue.name || 'Court Booking',
         sport: b.sport || selectedVenue.sport || 'Sports',
         date: b.booking_date || b.date,
@@ -199,14 +200,21 @@ export default function Dashboard({
       const timeMatch = rawTime.match(/\d{2}:\d{2}/);
       const slotTime = timeMatch ? timeMatch[0] : rawTime;
 
-      // Check if booking explicitly names a court (e.g. "08:00 - 09:00 · Court 2")
-      const explicitCourt = Number(rawTime.match(/Court\s*(\d+)/i)?.[1]);
-      const qty = Math.max(1, Number(b.courtCount || 1));
+      // Support both "Court 2" and "Courts 1, 2"
+      const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
+      const explicitCourts = courtListMatch
+        ? courtListMatch[1]
+            .split(',')
+            .map((n) => parseInt(n.trim(), 10))
+            .filter((n) => !isNaN(n) && n >= 1 && n <= totalCourts)
+        : [];
 
-      if (explicitCourt && explicitCourt >= 1 && explicitCourt <= totalCourts) {
-        map[`C${explicitCourt}_${slotTime}`] = b;
+      if (explicitCourts.length > 0) {
+        explicitCourts.forEach((c) => {
+          map[`C${c}_${slotTime}`] = b;
+        });
       } else {
-        // Assign `qty` courts starting from the next open court at `slotTime`
+        const qty = Math.max(1, Number(b.courtCount || 1));
         for (let q = 0; q < qty; q++) {
           let assignedCourt = (fallbackUsedByTime[slotTime] || 0) + 1;
           while (
@@ -261,7 +269,7 @@ export default function Dashboard({
         `Court ${courtNum} at ${time} is booked by ${guestLabel}. Cancel and release this slot?`
       );
       if (confirmRelease) {
-        await handleCancelReservation(existingBooking.id);
+        await handleCancelReservation(existingBooking);
       }
       return;
     }
@@ -323,16 +331,27 @@ export default function Dashboard({
     }
   };
 
-  const handleCancelReservation = async (id: string) => {
+  const handleCancelReservation = async (booking: DashboardBooking) => {
+    const targetId = booking.dbId || booking.id;
+
+    // Optimistically release the slot in the matrix immediately
     setVenueBookings((prev) =>
-      prev.map((b) => (b.id === id ? { ...b, status: 'Cancelled' } : b))
+      prev.map((b) =>
+        (b.dbId || b.id) === targetId ? { ...b, status: 'Cancelled' } : b
+      )
     );
-    const ok = await bookingService.cancel(id);
+
+    const ok = await bookingService.cancel(targetId);
     if (!ok) {
+      alert(
+        'Could not cancel booking in Supabase. Please make sure your bookings UPDATE policy allows venue owners to update bookings.'
+      );
       await fetchVenueBookings();
+      return;
     }
+
     if (onCancel) {
-      onCancel(id);
+      onCancel(booking.id);
     }
   };
 
@@ -904,7 +923,7 @@ export default function Dashboard({
                   <b className="text-sm">{money(b.price)}</b>
                   {b.status === 'Confirmed' && (
                     <button
-                      onClick={() => handleCancelReservation(b.id)}
+                      onClick={() => handleCancelReservation(b)}
                       className="text-xs font-bold text-red-600 underline hover:text-red-800 transition"
                     >
                       Cancel
