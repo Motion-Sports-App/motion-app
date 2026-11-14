@@ -29,15 +29,17 @@ export type CreateBookingInput = {
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Helper to normalize any JS Date object or string to strict 'YYYY-MM-DD'
 const sanitizeDateStr = (dateInput: string): string => {
-  if (!dateInput) return new Date().toISOString().split('T')[0];
+  if (!dateInput) {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(
+      now.getDate()
+    ).padStart(2, '0')}`;
+  }
   if (dateInput.includes('T')) return dateInput.split('T')[0];
-  const parsed = new Date(dateInput);
-  return isNaN(parsed.getTime()) ? dateInput : parsed.toISOString().split('T')[0];
+  return dateInput.trim();
 };
 
-// Parse explicit court numbers from strings like "08:00 - 09:00 · Court 2" or "08:00 - 09:00 · Court 1, 2"
 const extractExplicitCourts = (rawSlot: string): number[] => {
   const match = rawSlot.match(/Courts?\s*([\d,\s]+)/i);
   if (!match) return [];
@@ -45,6 +47,20 @@ const extractExplicitCourts = (rawSlot: string): number[] => {
     .split(',')
     .map((n) => parseInt(n.trim(), 10))
     .filter((n) => !isNaN(n) && n > 0);
+};
+
+// Extracts ONLY the start times of time slots (e.g. "14:00" from "14:00 - 15:00 · Court 1")
+// Never matches end times like "15:00" in "14:00 - 15:00"
+const extractSlotStartTimes = (rawSlot: string): Set<string> => {
+  const starts = new Set<string>();
+  const rangeMatches = [...rawSlot.matchAll(/(\d{2}:\d{2})\s*[-–]\s*\d{2}:\d{2}/g)];
+  if (rangeMatches.length > 0) {
+    rangeMatches.forEach((m) => starts.add(m[1]));
+  } else {
+    const firstTime = rawSlot.match(/(\d{2}:\d{2})/);
+    if (firstTime) starts.add(firstTime[1]);
+  }
+  return starts;
 };
 
 export const bookingService = {
@@ -68,20 +84,26 @@ export const bookingService = {
       date: b.booking_date || b.date,
       time: b.booking_time || b.time_slot,
       price: Number(b.total_amount || b.price || 0),
-      status: b.status === 'Cancelled' ? 'Cancelled' : 'Confirmed',
+      status:
+        String(b.status || '').toLowerCase() === 'cancelled'
+          ? 'Cancelled'
+          : 'Confirmed',
       pointsEarned: b.points_earned || 0,
     }));
   },
 
-  async getOccupiedSlots(venueId: string, date: string): Promise<Record<string, number>> {
+  async getOccupiedSlots(
+    venueId: string,
+    date: string
+  ): Promise<Record<string, number>> {
     const cleanDate = sanitizeDateStr(date);
 
     const { data, error } = await supabase
       .from('bookings')
-      .select('booking_time, time_slot, court_count')
+      .select('booking_time, time_slot, court_count, status')
       .eq('venue_id', venueId)
       .eq('booking_date', cleanDate)
-      .neq('status', 'Cancelled');
+      .not('status', 'ilike', 'cancelled');
 
     if (error) {
       console.error('Error fetching slot availability:', error);
@@ -89,19 +111,11 @@ export const bookingService = {
     }
 
     const counts: Record<string, number> = {};
-    data?.forEach((b: any) => {
-      const bookedQty = Number(b.court_count || 1);
+    (data || []).forEach((b: any) => {
+      const bookedQty = Math.max(1, Number(b.court_count || 1));
+      // Use time_slot first (fallback to booking_time) — never concatenate both to avoid double-counting
       const rawSlotStr = String(b.time_slot || b.booking_time || '');
-
-      // Extract all start times in the booking (handles both single "14:00 - 15:00" and multi-slot "14:00 - 15:00, 15:00 - 16:00")
-      const bookedStartTimes = new Set<string>();
-      const rangeMatches = [...rawSlotStr.matchAll(/(\d{2}:\d{2})\s*-\s*\d{2}:\d{2}/g)];
-      if (rangeMatches.length > 0) {
-        rangeMatches.forEach((m) => bookedStartTimes.add(m[1]));
-      } else {
-        const singleMatch = rawSlotStr.match(/(\d{2}:\d{2})/);
-        if (singleMatch) bookedStartTimes.add(singleMatch[1]);
-      }
+      const bookedStartTimes = extractSlotStartTimes(rawSlotStr);
 
       ALL_BOOKING_SLOTS.forEach((fullSlot) => {
         const slotStartTime = fullSlot.split(' - ')[0].trim();
@@ -119,7 +133,6 @@ export const bookingService = {
     const maxCourts = Math.max(1, Number(input.totalCourts || 4));
     const requestedQty = Math.max(1, Number(input.courtCount || 1));
 
-    // Split multi-slot selections (e.g. "14:00 - 15:00, 15:00 - 16:00") while preserving single-slot strings
     const rawSlots = input.timeSlot.includes('· Court')
       ? [input.timeSlot]
       : input.timeSlot
@@ -129,10 +142,10 @@ export const bookingService = {
 
     const { data: existingBookings } = await supabase
       .from('bookings')
-      .select('time_slot, booking_time, court_count')
+      .select('time_slot, booking_time, court_count, status')
       .eq('venue_id', input.venueId)
       .eq('booking_date', cleanDate)
-      .neq('status', 'Cancelled');
+      .not('status', 'ilike', 'cancelled');
 
     const assignCourtsForSlot = (slotStr: string): string => {
       if (/Court\s*\d+/i.test(slotStr)) return slotStr;
@@ -143,17 +156,14 @@ export const bookingService = {
 
       (existingBookings || []).forEach((b: any) => {
         const raw = String(b.time_slot || b.booking_time || '');
-        const hasStart =
-          [...raw.matchAll(/(\d{2}:\d{2})\s*-\s*\d{2}:\d{2}/g)].some((m) => m[1] === startTime) ||
-          (!raw.includes('-') && raw.includes(startTime));
-
-        if (!hasStart) return;
+        const starts = extractSlotStartTimes(raw);
+        if (!starts.has(startTime)) return;
 
         const explicit = extractExplicitCourts(raw);
         if (explicit.length > 0) {
           explicit.forEach((c) => occupiedCourts.add(c));
         } else {
-          legacyUnnumberedCount += Number(b.court_count || 1);
+          legacyUnnumberedCount += Math.max(1, Number(b.court_count || 1));
         }
       });
 
@@ -167,7 +177,11 @@ export const bookingService = {
       }
 
       const assignedCourts: number[] = [];
-      for (let c = 1; c <= maxCourts && assignedCourts.length < requestedQty; c++) {
+      for (
+        let c = 1;
+        c <= maxCourts && assignedCourts.length < requestedQty;
+        c++
+      ) {
         if (!occupiedCourts.has(c)) {
           assignedCourts.push(c);
           occupiedCourts.add(c);
@@ -182,10 +196,11 @@ export const bookingService = {
       return `${slotStr} · ${courtLabel}`;
     };
 
-    // If multiple slots were selected in the modal, create a booking row per slot so each hour tracks its own court assignment cleanly
     if (rawSlots.length > 1) {
-      const perSlotPrice = Math.round((Number(input.totalPrice || 0) / rawSlots.length) * 100) / 100;
-      const results = [];
+      const perSlotPrice =
+        Math.round((Number(input.totalPrice || 0) / rawSlots.length) * 100) /
+        100;
+      let firstData: any = null;
 
       for (const slot of rawSlots) {
         const enrichedSlot = assignCourtsForSlot(slot);
@@ -206,13 +221,13 @@ export const bookingService = {
           console.error('RPC Multi-Slot Booking Error:', error);
           return { success: false, error: error.message };
         }
-        results.push(data);
+        if (!firstData) firstData = data;
       }
 
-      return { success: true, data: results };
+      // Return firstData directly so VenueModal's `result.data.booking_code` works seamlessly
+      return { success: true, data: firstData };
     }
 
-    // Single-slot booking
     const finalTimeSlot = assignCourtsForSlot(rawSlots[0] || input.timeSlot);
     const { data, error } = await supabase.rpc('create_court_booking', {
       p_venue_id: input.venueId,
@@ -237,21 +252,29 @@ export const bookingService = {
 
   async cancel(id: string): Promise<boolean> {
     const cleanId = String(id).trim();
-    const isUuid = UUID_REGEX.test(cleanId);
+    if (!cleanId) return false;
 
-    const query = supabase
+    if (UUID_REGEX.test(cleanId) || /^\d+$/.test(cleanId)) {
+      const { data, error } = await supabase
+        .from('bookings')
+        .update({ status: 'Cancelled' })
+        .eq('id', cleanId)
+        .select('id');
+
+      if (!error && data && data.length > 0) return true;
+    }
+
+    const { data: codeData, error: codeError } = await supabase
       .from('bookings')
-      .update({ status: 'Cancelled' });
+      .update({ status: 'Cancelled' })
+      .eq('booking_code', cleanId)
+      .select('id');
 
-    const { data, error } = isUuid
-      ? await query.eq('id', cleanId).select('id')
-      : await query.eq('booking_code', cleanId).select('id');
-
-    if (error) {
-      console.error('Failed to update booking status in Supabase:', error);
+    if (codeError) {
+      console.error('Failed to update booking status in Supabase:', codeError);
       return false;
     }
 
-    return Boolean(data && data.length > 0);
+    return Boolean(codeData && codeData.length > 0);
   },
 };
