@@ -2,7 +2,6 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import {
-  ArrowLeft,
   Building2,
   Calendar,
   Clock,
@@ -43,7 +42,7 @@ export default function Dashboard({
   user: any;
   bookings: Booking[];
   venues: Venue[];
-  onBack: () => void;
+  onBack?: () => void;
   onCancel: (id: string) => void;
   onVenueUpdate?: (updatedVenue: Venue) => void;
 }) {
@@ -198,30 +197,16 @@ export default function Dashboard({
   };
 
   return (
-    <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-10 lg:px-8 lg:py-16">
-      <button
-        onClick={onBack}
-        className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 transition hover:text-black"
-      >
-        <ArrowLeft size={17} /> Back to main site
-      </button>
-
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-black/10 pb-6">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">
-            PARTNER DASHBOARD
-          </p>
-          <h1 className="mt-1 text-4xl font-black tracking-[-.06em]">Control Centre</h1>
-          <p className="mt-1 text-sm text-black/55">
-            Managing{' '}
-            <span className="font-bold text-black">
-              {selectedVenue?.name || 'No active venue assigned'}
-            </span>
-          </p>
-        </div>
+    <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-6 lg:px-8 lg:py-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-black/10 pb-4">
+        <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">
+          {activeRole === 'venue'
+            ? `${selectedVenue?.name || 'Venue'} Control Centre`
+            : 'Coach Control Centre'}
+        </p>
 
         <div className="flex flex-wrap items-center gap-3">
-          {ownedVenues.length > 1 && (
+          {activeRole === 'venue' && ownedVenues.length > 1 && (
             <select
               value={selectedVenue?.id || ''}
               onChange={(e) => {
@@ -266,8 +251,8 @@ export default function Dashboard({
       {activeRole === 'venue' && (
         selectedVenue ? (
           <>
-            {/* COURT & TIMESLOT MATRIX (TOP PRIORITY) */}
-            <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+            {/* COURT & TIMESLOT MATRIX */}
+            <div className="mt-6 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-6">
                 <div>
                   <h2 className="text-2xl font-black tracking-tight">Court & Timeslot Matrix</h2>
@@ -493,7 +478,7 @@ export default function Dashboard({
             </div>
           </>
         ) : (
-          <div className="mt-10 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
+          <div className="mt-8 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
             <h2 className="text-xl font-black">No active venue found</h2>
             <p className="mt-2 text-xs text-black/55">
               This account is no longer linked to an active venue listing.
@@ -503,7 +488,7 @@ export default function Dashboard({
       )}
 
       {activeRole === 'coach' && (
-        <div className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-3">
+        <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
           <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
               <span>COACHING REVENUE</span>
