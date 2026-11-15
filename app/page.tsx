@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowRight,
@@ -15,8 +15,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { venueService } from '@/lib/services/venueService';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
-import { partnerService } from '@/lib/services/partnerService';
 import { SPORTS_LIST, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
+import { useBrowserHistorySync } from '@/hooks/useBrowserHistoryState';
 import type { Sport, Venue } from '@/lib/data';
 
 import Navbar from '@/components/Navbar';
@@ -40,6 +40,13 @@ const dateLabel = (d: Date) => {
   return `${year}-${month}-${day}`;
 };
 
+type ActiveView =
+  | 'home'
+  | 'bookings'
+  | 'venue-admin'
+  | 'partner-onboarding'
+  | 'motion-admin';
+
 export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState<any>(null);
@@ -54,22 +61,64 @@ export default function Home() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [confirmed, setConfirmed] = useState<Booking | null>(null);
 
-  // View States
-  const [showUserBookings, setShowUserBookings] = useState(false);
-  const [showVenueAdmin, setShowVenueAdmin] = useState(false);
-  const [showPartnerOnboarding, setShowPartnerOnboarding] = useState(false);
-  const [showMotionAdmin, setShowMotionAdmin] = useState(false);
+  // Unified View State synced with browser history
+  const [activeView, setActiveView] = useState<ActiveView>('home');
   const [showFilters, setShowFilters] = useState(false);
 
-  const resetViews = () => {
-    setShowUserBookings(false);
-    setShowVenueAdmin(false);
-    setShowPartnerOnboarding(false);
-    setShowMotionAdmin(false);
+  const venuesRef = useRef<Venue[]>([]);
+  venuesRef.current = venues;
+
+  const restoreVenueById = useCallback((venueId: string | null) => {
+    if (!venueId) {
+      setSelected(null);
+      return;
+    }
+    const found = venuesRef.current.find((v) => String(v.id) === String(venueId));
+    setSelected(found || null);
+  }, []);
+
+  const handleSetActiveView = useCallback((view: string) => {
+    const validViews: ActiveView[] = [
+      'home',
+      'bookings',
+      'venue-admin',
+      'partner-onboarding',
+      'motion-admin',
+    ];
+    setActiveView(
+      validViews.includes(view as ActiveView) ? (view as ActiveView) : 'home'
+    );
+  }, []);
+
+  const { navigateTo } = useBrowserHistorySync({
+    activeView,
+    setActiveView: handleSetActiveView,
+    selectedVenueId: selected?.id || null,
+    onRestoreVenueById: restoreVenueById,
+  });
+
+  // Restore initial view / venue from URL on initial load or refresh
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const initialView = params.get('view');
+    if (initialView) {
+      handleSetActiveView(initialView);
+    }
+  }, [handleSetActiveView]);
+
+  const resetViews = (pushHistory = true) => {
+    if (pushHistory) {
+      navigateTo('home', null);
+    } else {
+      setActiveView('home');
+      setSelected(null);
+    }
   };
 
   const handleNavigate = (targetId?: string) => {
-    resetViews();
+    if (activeView !== 'home' || selected) {
+      navigateTo('home', null);
+    }
     if (targetId) {
       setTimeout(() => {
         document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth' });
@@ -103,7 +152,17 @@ export default function Home() {
       slots: v.slots || [],
     }));
     setVenues(safeData);
+    venuesRef.current = safeData;
     setLoading(false);
+
+    // If URL had ?venue=<id> on initial page load, open that venue modal once venues are fetched
+    const params = new URLSearchParams(window.location.search);
+    const initialVenueId = params.get('venue');
+    if (initialVenueId) {
+      const found = safeData.find((v) => String(v.id) === String(initialVenueId));
+      if (found) setSelected(found);
+    }
+
     return safeData;
   };
 
@@ -120,20 +179,19 @@ export default function Home() {
     return venues.filter((v) => {
       const sportMatch = activeSport === 'All sports' || v.sport === activeSport;
       const q = query.trim().toLowerCase();
-      
+
       const facilitiesList = Array.isArray(v.facilities) ? v.facilities.join(' ') : '';
       const queryMatch =
         !q || `${v.name || ''} ${v.sport || ''} ${v.area || ''} ${facilitiesList}`.toLowerCase().includes(q);
       const areaMatch =
         area === 'Anywhere in Bangkok' || (v.area && v.area.toLowerCase().includes(area.toLowerCase()));
       const priceMatch = maxPrice === 'Any price' || (v.price && v.price <= Number(maxPrice));
-      
+
       return sportMatch && queryMatch && areaMatch && priceMatch;
     });
   }, [venues, activeSport, query, area, maxPrice]);
 
   const handleVenueAdminAccess = async () => {
-    resetViews();
     const latestVenues = await loadVenues();
 
     const isSuperAdmin =
@@ -145,20 +203,31 @@ export default function Home() {
       latestVenues.some((v) => v.user_id === user.id || v.owner_id === user.id);
 
     if (isSuperAdmin || userHasActiveVenue) {
-      setShowVenueAdmin(true);
+      navigateTo('venue-admin', null);
     } else {
-      setShowPartnerOnboarding(true);
+      navigateTo('partner-onboarding', null);
     }
   };
 
   const handleMotionAdminOpen = () => {
-    resetViews();
-    setShowMotionAdmin(true);
+    navigateTo('motion-admin', null);
   };
 
   const handleBookingsOpen = () => {
-    resetViews();
-    setShowUserBookings(true);
+    navigateTo('bookings', null);
+  };
+
+  const handleOpenVenueModal = (venue: Venue) => {
+    navigateTo(activeView, venue.id);
+  };
+
+  const handleCloseVenueModal = () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('venue')) {
+      window.history.back();
+    } else {
+      setSelected(null);
+    }
   };
 
   return (
@@ -179,33 +248,33 @@ export default function Home() {
         />
       </div>
 
-      {/* RENDER ACTIVE VIEW BASED ON TOGGLED STATE */}
-      {showMotionAdmin ? (
+      {/* RENDER ACTIVE VIEW BASED ON SYNCED VIEW STATE */}
+      {activeView === 'motion-admin' ? (
         <MotionAdminCenter
           user={user}
-          onBack={() => resetViews()}
+          onBack={() => resetViews(true)}
           onVenueApproved={loadVenues}
         />
-      ) : showPartnerOnboarding ? (
+      ) : activeView === 'partner-onboarding' ? (
         <PartnerOnboardingView
           user={user}
           venues={venues}
-          onBack={() => resetViews()}
+          onBack={() => resetViews(true)}
           onAuthModalOpen={() => setShowAuthModal(true)}
         />
-      ) : showUserBookings ? (
+      ) : activeView === 'bookings' ? (
         <UserBookingsView
           user={user}
           bookings={bookings}
-          onBack={() => resetViews()}
+          onBack={() => resetViews(true)}
           onCancel={handleCancelBooking}
         />
-      ) : showVenueAdmin ? (
+      ) : activeView === 'venue-admin' ? (
         <Dashboard
           user={user}
           bookings={bookings}
           venues={venues}
-          onBack={() => resetViews()}
+          onBack={() => resetViews(true)}
           onCancel={handleCancelBooking}
           onVenueUpdate={(updatedVenue) => {
             setVenues((prev) =>
@@ -328,7 +397,7 @@ export default function Home() {
               ) : filtered.length ? (
                 <div className="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
                   {filtered.map((v) => (
-                    <VenueCard key={v.id} venue={v} onSelect={() => setSelected(v)} />
+                    <VenueCard key={v.id} venue={v} onSelect={() => handleOpenVenueModal(v)} />
                   ))}
                 </div>
               ) : (
@@ -360,11 +429,11 @@ export default function Home() {
           date={selectedDate}
           setDate={setSelectedDate}
           user={user}
-          onClose={() => setSelected(null)}
+          onClose={handleCloseVenueModal}
           onBookSuccess={(newBooking) => {
             setBookings((old) => [newBooking, ...old]);
             setConfirmed(newBooking);
-            setSelected(null);
+            navigateTo(activeView, null);
           }}
         />
       )}
@@ -374,12 +443,12 @@ export default function Home() {
       )}
 
       {confirmed && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" 
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
           onClick={() => setConfirmed(null)}
         >
-          <div 
-            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9" 
+          <div
+            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
@@ -408,18 +477,18 @@ export default function Home() {
             </div>
 
             <div className="mt-6 flex flex-col gap-2">
-              <button 
+              <button
                 onClick={() => {
                   setConfirmed(null);
                   handleBookingsOpen();
-                }} 
+                }}
                 className="w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white transition hover:bg-[#30372a]"
               >
                 View my bookings
               </button>
 
-              <button 
-                onClick={() => setConfirmed(null)} 
+              <button
+                onClick={() => setConfirmed(null)}
                 className="w-full rounded-full border border-black/10 bg-transparent py-2.5 text-xs font-bold text-black/60 transition hover:bg-black/5 hover:text-black"
               >
                 Done
