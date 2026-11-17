@@ -93,7 +93,7 @@ export default function Dashboard({
   const isSuperAdmin = useMemo(() => {
     return Boolean(
       user?.email &&
-        ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com'].includes(
+        ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com', 'kvorakijkamjorn@gmail.com'].includes(
           user.email.toLowerCase()
         )
     );

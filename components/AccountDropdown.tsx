@@ -26,8 +26,7 @@ export default function AccountDropdown({
     [
       'mingtan0403@gmail.com',
       'motionsportsapp@gmail.com',
-      'ming@motion.app',
-      'admin@motion.app',
+      'kvorakijkamjorn@gmail.com'
     ].includes(user.email.toLowerCase());
 
   // Show Venue Control if user is approved venue owner OR super admin
