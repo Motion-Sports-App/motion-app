@@ -196,7 +196,7 @@ export default function Home() {
 
     const isSuperAdmin =
       user?.email &&
-      ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com'].includes(user.email.toLowerCase());
+      ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com', 'kvorakijkamjorn@gmail.com'].includes(user.email.toLowerCase());
 
     const userHasActiveVenue =
       Boolean(user?.id) &&
