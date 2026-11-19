@@ -27,6 +27,7 @@ import UserBookingsView from '@/components/UserBookingsView';
 import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 import MotionAdminCenter from '@/components/MotionAdminCenter';
+import { partnerService } from '@/lib/services/partnerService';
 
 const money = (n?: number | null) => {
   const val = Number(n);
@@ -63,6 +64,7 @@ export default function Home() {
 
   // Unified View State synced with browser history
   const [activeView, setActiveView] = useState<ActiveView>('home');
+  const [hasActiveCoach, setHasActiveCoach] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   const venuesRef = useRef<Venue[]>([]);
@@ -144,6 +146,16 @@ export default function Home() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (user?.id) {
+      partnerService.getUserApplicationStatuses(user.id).then(({ coachStatus }) => {
+        setHasActiveCoach(coachStatus === 'approved');
+      });
+    } else {
+      setHasActiveCoach(false);
+    }
+  }, [user]);
+
   const loadVenues = async () => {
     const data = await venueService.getAll();
     const safeData = (data || []).map((v) => ({
@@ -196,13 +208,24 @@ export default function Home() {
 
     const isSuperAdmin =
       user?.email &&
-      ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com', 'kvorakijkamjorn@gmail.com'].includes(user.email.toLowerCase());
+      [
+        'mingtan0403@gmail.com',
+        'motionsportsapp@gmail.com',
+        'kvorakijkamjorn@gmail.com',
+      ].includes(user.email.toLowerCase());
 
     const userHasActiveVenue =
       Boolean(user?.id) &&
       latestVenues.some((v) => v.user_id === user.id || v.owner_id === user.id);
 
-    if (isSuperAdmin || userHasActiveVenue) {
+    let userHasActiveCoach = hasActiveCoach;
+    if (user?.id) {
+      const { coachStatus } = await partnerService.getUserApplicationStatuses(user.id);
+      userHasActiveCoach = coachStatus === 'approved';
+      setHasActiveCoach(userHasActiveCoach);
+    }
+
+    if (isSuperAdmin || userHasActiveVenue || userHasActiveCoach) {
       navigateTo('venue-admin', null);
     } else {
       navigateTo('partner-onboarding', null);
@@ -277,6 +300,7 @@ export default function Home() {
           user={user}
           bookings={bookings}
           venues={venues}
+          hasActiveCoach={hasActiveCoach}
           onBack={() => resetViews(true)}
           onCancel={handleCancelBooking}
           onVenueUpdate={(updatedVenue) => {

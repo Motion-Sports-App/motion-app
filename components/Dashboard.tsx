@@ -70,6 +70,7 @@ export default function Dashboard({
   user,
   bookings,
   venues,
+  hasActiveCoach = false,
   onBack,
   onCancel,
   onVenueUpdate,
@@ -77,6 +78,7 @@ export default function Dashboard({
   user: any;
   bookings: Booking[];
   venues: Venue[];
+  hasActiveCoach?: boolean;
   onBack?: () => void;
   onCancel: (id: string) => void;
   onVenueUpdate?: (updatedVenue: Venue) => void;
@@ -131,6 +133,34 @@ export default function Dashboard({
     if (ownedVenues.length === 0) return null;
     return ownedVenues.find((v) => v.id === selectedVenueId) || ownedVenues[0];
   }, [ownedVenues, selectedVenueId]);
+
+  const [isApprovedCoach, setIsApprovedCoach] = useState<boolean>(hasActiveCoach);
+
+  useEffect(() => {
+    setIsApprovedCoach(hasActiveCoach);
+  }, [hasActiveCoach]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      setIsApprovedCoach(false);
+      return;
+    }
+    partnerService.getUserApplicationStatuses(user.id).then(({ coachStatus }) => {
+      setIsApprovedCoach(coachStatus === 'approved');
+    });
+  }, [user?.id]);
+
+  const hasVenueAccess = isSuperAdmin || ownedVenues.length > 0;
+  const hasCoachAccess = isSuperAdmin || isApprovedCoach;
+  const hasBothRoles = hasVenueAccess && hasCoachAccess;
+
+  useEffect(() => {
+    if (hasVenueAccess && !hasCoachAccess) {
+      setActiveRole('venue');
+    } else if (!hasVenueAccess && hasCoachAccess) {
+      setActiveRole('coach');
+    }
+  }, [hasVenueAccess, hasCoachAccess]);
 
   const fetchVenueBookings = useCallback(async () => {
     if (!selectedVenue?.id && !selectedVenue?.name) return;
@@ -696,28 +726,42 @@ export default function Dashboard({
             </select>
           )}
 
-          <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
-            <button
-              onClick={() => setActiveRole('venue')}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
-                activeRole === 'venue'
-                  ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                  : 'text-black/60 hover:text-black'
-              }`}
-            >
-              <Building2 size={15} /> Venue Owner
-            </button>
-            <button
-              onClick={() => setActiveRole('coach')}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
-                activeRole === 'coach'
-                  ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                  : 'text-black/60 hover:text-black'
-              }`}
-            >
-              <UserCheck size={15} /> Coach Portal
-            </button>
-          </div>
+          {hasBothRoles ? (
+            <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
+              <button
+                onClick={() => setActiveRole('venue')}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
+                  activeRole === 'venue'
+                    ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
+                    : 'text-black/60 hover:text-black'
+                }`}
+              >
+                <Building2 size={15} /> Venue Owner
+              </button>
+              <button
+                onClick={() => setActiveRole('coach')}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
+                  activeRole === 'coach'
+                    ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
+                    : 'text-black/60 hover:text-black'
+                }`}
+              >
+                <UserCheck size={15} /> Coach Portal
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-2xl bg-[#101310] px-4 py-2 text-xs font-black text-[#d8ff3e] shadow-sm">
+              {activeRole === 'coach' ? (
+                <>
+                  <UserCheck size={15} /> Coach Portal
+                </>
+              ) : (
+                <>
+                  <Building2 size={15} /> Venue Owner
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1196,6 +1240,70 @@ export default function Dashboard({
                 </div>
               )}
             </div>
+
+            {/* VENUE MASTER RESERVATION LIST */}
+            <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+              <h2 className="text-2xl font-black tracking-tight">
+                Master Reservation List
+              </h2>
+              <p className="mt-1 text-xs text-black/50">
+                Showing active player bookings for{' '}
+                {selectedVenue?.name || 'your venue'}.
+              </p>
+
+              <div className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10">
+                {venueBookings.length > 0 ? (
+                  venueBookings.map((b) => (
+                    <div
+                      key={b.id}
+                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center justify-between"
+                    >
+                      <div>
+                        <span className="text-[10px] font-black uppercase text-[#81971d]">
+                          {b.sport} · Ref: <span className="font-mono">{b.id}</span>
+                        </span>
+                        <p className="font-extrabold text-base text-black mt-0.5">
+                          {b.venue}{' '}
+                          {(b.customerName || b.customerEmail) && (
+                            <span className="text-xs font-semibold text-black/50">
+                              ({b.customerName || b.customerEmail})
+                            </span>
+                          )}
+                        </p>
+                        <p className="text-xs text-black/50">
+                          {b.date} · {b.time}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`rounded-full px-3 py-1 text-[10px] font-black ${
+                            b.status === 'Cancelled'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-[#edf5d2] text-[#5d7112]'
+                          }`}
+                        >
+                          {b.status}
+                        </span>
+                        <b className="text-sm">{money(b.price)}</b>
+                        {b.status === 'Confirmed' && (
+                          <button
+                            onClick={() => handleCancelReservation(b)}
+                            className="text-xs font-bold text-red-600 underline hover:text-red-800 transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="p-8 text-center text-xs font-bold text-black/45">
+                    No active reservations found for this view.
+                  </div>
+                )}
+              </div>
+            </div>
           </>
         ) : (
           <div className="mt-8 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
@@ -1207,95 +1315,46 @@ export default function Dashboard({
         ))}
 
       {activeRole === 'coach' && (
-        <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-              <span>COACHING REVENUE</span>
-              <DollarSign size={18} className="text-[#81971d]" />
-            </div>
-            <p className="mt-2 text-3xl font-black">{money(stats.revenue)}</p>
-          </div>
-
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-              <span>CLIENT SESSIONS</span>
-              <CheckCircle2 size={18} className="text-green-600" />
-            </div>
-            <p className="mt-2 text-3xl font-black">{stats.activeCount}</p>
-          </div>
-
-          <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
-              <span>CANCELLATIONS</span>
-              <XCircle size={18} className="text-red-500" />
-            </div>
-            <p className="mt-2 text-3xl font-black">{stats.cancelCount}</p>
-          </div>
-        </div>
-      )}
-
-      <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-        <h2 className="text-2xl font-black tracking-tight">
-          Master Reservation List
-        </h2>
-        <p className="mt-1 text-xs text-black/50">
-          Showing active player bookings for{' '}
-          {selectedVenue?.name || 'your venue'}.
-        </p>
-
-        <div className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10">
-          {venueBookings.length > 0 ? (
-            venueBookings.map((b) => (
-              <div
-                key={b.id}
-                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center justify-between"
-              >
-                <div>
-                  <span className="text-[10px] font-black uppercase text-[#81971d]">
-                    {b.sport} · Ref: <span className="font-mono">{b.id}</span>
-                  </span>
-                  <p className="font-extrabold text-base text-black mt-0.5">
-                    {b.venue}{' '}
-                    {(b.customerName || b.customerEmail) && (
-                      <span className="text-xs font-semibold text-black/50">
-                        ({b.customerName || b.customerEmail})
-                      </span>
-                    )}
-                  </p>
-                  <p className="text-xs text-black/50">
-                    {b.date} · {b.time}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span
-                    className={`rounded-full px-3 py-1 text-[10px] font-black ${
-                      b.status === 'Cancelled'
-                        ? 'bg-red-100 text-red-600'
-                        : 'bg-[#edf5d2] text-[#5d7112]'
-                    }`}
-                  >
-                    {b.status}
-                  </span>
-                  <b className="text-sm">{money(b.price)}</b>
-                  {b.status === 'Confirmed' && (
-                    <button
-                      onClick={() => handleCancelReservation(b)}
-                      className="text-xs font-bold text-red-600 underline hover:text-red-800 transition"
-                    >
-                      Cancel
-                    </button>
-                  )}
-                </div>
+        <>
+          <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                <span>COACHING REVENUE</span>
+                <DollarSign size={18} className="text-[#81971d]" />
               </div>
-            ))
-          ) : (
-            <div className="p-8 text-center text-xs font-bold text-black/45">
-              No active reservations found for this view.
+              <p className="mt-2 text-3xl font-black">{money(0)}</p>
             </div>
-          )}
-        </div>
-      </div>
+
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                <span>CLIENT SESSIONS</span>
+                <CheckCircle2 size={18} className="text-green-600" />
+              </div>
+              <p className="mt-2 text-3xl font-black">0</p>
+            </div>
+
+            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                <span>CANCELLATIONS</span>
+                <XCircle size={18} className="text-red-500" />
+              </div>
+              <p className="mt-2 text-3xl font-black">0</p>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
+            <h2 className="text-2xl font-black tracking-tight">
+              Coaching Sessions
+            </h2>
+            <p className="mt-1 text-xs text-black/50">
+              Your upcoming and past player coaching sessions.
+            </p>
+            <div className="mt-6 rounded-2xl border border-black/10 p-8 text-center text-xs font-bold text-black/45">
+              No coaching sessions booked yet.
+            </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
