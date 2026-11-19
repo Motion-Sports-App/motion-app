@@ -821,12 +821,12 @@ export default function Dashboard({
               {/* SELECTED BOOKED SLOTS ACTION BAR (MOVE OR CANCEL) */}
               {selectedBookedCells.length > 0 && (
                 <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                  <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-xs">
                     <span className="rounded-lg bg-red-600 px-2.5 py-1 font-black text-white">
                       {selectedBookedCells.length} Booked{' '}
                       {selectedBookedCells.length === 1 ? 'Slot' : 'Slots'} Selected
                     </span>
-                    <span className="font-semibold text-black/70">
+                    <span className="line-clamp-2 font-semibold text-black/70">
                       {Array.from(
                         new Set(
                           selectedBookedCells.map(
@@ -840,7 +840,7 @@ export default function Dashboard({
                     </span>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {/* Move to another court */}
                     <div className="flex items-center gap-1.5 rounded-xl border border-black/15 bg-white px-2.5 py-1 text-xs font-bold">
                       <ArrowRightLeft size={13} className="text-black/50" />
