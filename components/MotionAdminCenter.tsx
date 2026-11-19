@@ -1,13 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ArrowLeft, ShieldCheck, RefreshCw, Trash2, Building2, Clock } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import {
+  ArrowLeft,
+  ShieldCheck,
+  RefreshCw,
+  Trash2,
+  Search,
+  X,
+} from 'lucide-react';
 import { partnerService } from '@/lib/services/partnerService';
 
 const MOTION_EMPLOYEE_EMAILS = [
   'mingtan0403@gmail.com',
   'motionsportsapp@gmail.com',
-  'kvorakijkamjorn@gmail.com'
+  'kvorakijkamjorn@gmail.com',
 ];
 
 export default function MotionAdminCenter({
@@ -22,6 +29,7 @@ export default function MotionAdminCenter({
   const [activeTab, setActiveTab] = useState<'applications' | 'active_venues'>('applications');
   const [applications, setApplications] = useState<any[]>([]);
   const [venues, setVenues] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [actionId, setActionId] = useState<string | null>(null);
 
@@ -53,6 +61,30 @@ export default function MotionAdminCenter({
     }
   }
 
+  const filteredApplications = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return applications;
+
+    return applications.filter((app) => {
+      const name = String(app.name || '').toLowerCase();
+      const venueId = String(app.id || '').toLowerCase();
+      const ownerId = String(app.owner_id || app.user_id || '').toLowerCase();
+      return name.includes(q) || venueId.includes(q) || ownerId.includes(q);
+    });
+  }, [applications, searchQuery]);
+
+  const filteredVenues = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return venues;
+
+    return venues.filter((venue) => {
+      const name = String(venue.name || '').toLowerCase();
+      const venueId = String(venue.id || '').toLowerCase();
+      const ownerId = String(venue.owner_id || venue.user_id || '').toLowerCase();
+      return name.includes(q) || venueId.includes(q) || ownerId.includes(q);
+    });
+  }, [venues, searchQuery]);
+
   const handleApprove = async (
     appId: string,
     applicantEmail?: string,
@@ -65,7 +97,7 @@ export default function MotionAdminCenter({
       if (res.success) {
         if (applicantEmail) {
           console.log('Sending approval email to:', applicantEmail);
-          
+
           const emailRes = await fetch('/api/send-approval-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -106,7 +138,11 @@ export default function MotionAdminCenter({
   };
 
   const handleDeleteVenue = async (venueId: string, ownerId: string, venueName: string) => {
-    if (!confirm(`Are you sure you want to delete active venue "${venueName}" and reset the application for testing?`)) {
+    if (
+      !confirm(
+        `Are you sure you want to delete active venue "${venueName}" and reset the application for testing?`
+      )
+    ) {
       return;
     }
 
@@ -130,7 +166,10 @@ export default function MotionAdminCenter({
   if (!isMotionEmployee) {
     return (
       <section className="mx-auto min-h-[70vh] max-w-2xl px-5 py-16 text-center">
-        <button onClick={onBack} className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 hover:text-black">
+        <button
+          onClick={onBack}
+          className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 hover:text-black"
+        >
           <ArrowLeft size={17} /> Back
         </button>
         <div className="rounded-3xl border border-red-200 bg-red-50 p-8 shadow-sm">
@@ -146,7 +185,10 @@ export default function MotionAdminCenter({
 
   return (
     <section className="mx-auto min-h-[80vh] max-w-5xl px-5 py-10 lg:px-8 lg:py-14">
-      <button onClick={onBack} className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 hover:text-black">
+      <button
+        onClick={onBack}
+        className="mb-6 flex items-center gap-2 text-sm font-bold text-black/55 hover:text-black"
+      >
         <ArrowLeft size={17} /> Back to dashboard
       </button>
 
@@ -156,7 +198,9 @@ export default function MotionAdminCenter({
             INTERNAL HQ ONLY
           </span>
           <h1 className="mt-2 text-3xl font-black text-black">Motion HQ Control Center</h1>
-          <p className="mt-1 text-xs text-black/55">Manage venue approvals and clear test venue records.</p>
+          <p className="mt-1 text-xs text-black/55">
+            Manage venue approvals and clear test venue records.
+          </p>
         </div>
 
         <button
@@ -166,6 +210,30 @@ export default function MotionAdminCenter({
         >
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="mt-6">
+        <label className="flex items-center gap-3 rounded-2xl border border-black/15 bg-white px-4 py-3 shadow-xs focus-within:border-black">
+          <Search size={16} className="shrink-0 text-black/40" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by venue name, venue ID, or owner ID..."
+            className="min-w-0 flex-1 bg-transparent text-xs font-medium text-black outline-none placeholder:text-black/40"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              aria-label="Clear search"
+              className="rounded-full p-1 text-black/40 hover:bg-black/5 hover:text-black"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </label>
       </div>
 
       {/* Navigation Tabs */}
@@ -178,7 +246,7 @@ export default function MotionAdminCenter({
               : 'text-black/40 hover:text-black/70'
           }`}
         >
-          Pending Applications ({applications.length})
+          Pending Applications ({filteredApplications.length})
         </button>
         <button
           onClick={() => setActiveTab('active_venues')}
@@ -188,7 +256,7 @@ export default function MotionAdminCenter({
               : 'text-black/40 hover:text-black/70'
           }`}
         >
-          Active Venues ({venues.length})
+          Active Venues ({filteredVenues.length})
         </button>
       </div>
 
@@ -197,10 +265,10 @@ export default function MotionAdminCenter({
         {loading ? (
           <div className="p-12 text-center text-xs font-bold text-black/40">Loading data...</div>
         ) : activeTab === 'applications' ? (
-          applications.length > 0 ? (
-            applications.map((app) => {
-              // Target email fallback resolution
+          filteredApplications.length > 0 ? (
+            filteredApplications.map((app) => {
               const targetEmail = app.applicant_email || app.email || app.user_email;
+              const ownerId = app.owner_id || app.user_id || 'N/A';
 
               return (
                 <div
@@ -217,7 +285,10 @@ export default function MotionAdminCenter({
                       </span>
                     </div>
                     <h3 className="mt-1 text-xl font-black text-black">{app.name}</h3>
-                    <p className="text-xs text-black/60">
+                    <p className="mt-0.5 font-mono text-xs text-black/60">
+                      Venue ID: {app.id} · Owner ID: {ownerId}
+                    </p>
+                    <p className="mt-1 text-[11px] text-black/40">
                       {app.area} · {app.address} · {app.total_courts} Courts @ ฿{app.price}/hr
                     </p>
                     {targetEmail ? (
@@ -252,13 +323,16 @@ export default function MotionAdminCenter({
             })
           ) : (
             <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
-              No pending venue applications found.
+              {searchQuery
+                ? `No pending applications matching "${searchQuery}".`
+                : 'No pending venue applications found.'}
             </div>
           )
-        ) : (
-          /* Active Venues Tab */
-          venues.length > 0 ? (
-            venues.map((venue) => (
+        ) : filteredVenues.length > 0 ? (
+          filteredVenues.map((venue) => {
+            const ownerId = venue.owner_id || venue.user_id || 'N/A';
+
+            return (
               <div
                 key={venue.id}
                 className="flex flex-col gap-4 rounded-2xl border border-black/10 bg-white p-6 shadow-sm sm:flex-row sm:items-center sm:justify-between"
@@ -273,28 +347,31 @@ export default function MotionAdminCenter({
                     </span>
                   </div>
                   <h3 className="mt-1 text-xl font-black text-black">{venue.name}</h3>
-                  <p className="text-xs text-black/60">
-                    {venue.area} · {venue.address} · {venue.total_courts} Courts @ ฿{venue.price_per_hour || venue.price}/hr
+                  <p className="mt-0.5 font-mono text-xs text-black/60">
+                    Venue ID: {venue.id} · Owner ID: {ownerId}
                   </p>
-                  <p className="mt-1 text-[11px] font-mono text-black/40">
-                    Owner ID: {venue.owner_id || 'N/A'}
+                  <p className="mt-1 text-[11px] text-black/40">
+                    {venue.area} · {venue.address} · {venue.total_courts} Courts @ ฿
+                    {venue.price_per_hour || venue.price}/hr
                   </p>
                 </div>
 
                 <button
                   disabled={actionId === venue.id}
-                  onClick={() => handleDeleteVenue(venue.id, venue.owner_id, venue.name)}
+                  onClick={() => handleDeleteVenue(venue.id, ownerId, venue.name)}
                   className="flex items-center justify-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-4 py-2.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
                 >
                   <Trash2 size={15} /> Delete Venue & Reset Account
                 </button>
               </div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
-              No active venues found in database.
-            </div>
-          )
+            );
+          })
+        ) : (
+          <div className="rounded-2xl border border-dashed border-black/20 p-12 text-center text-xs font-bold text-black/40">
+            {searchQuery
+              ? `No active venues matching "${searchQuery}".`
+              : 'No active venues found in database.'}
+          </div>
         )}
       </div>
     </section>
