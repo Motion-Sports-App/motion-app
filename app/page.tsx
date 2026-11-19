@@ -214,6 +214,9 @@ export default function Home() {
   };
 
   const handleBookingsOpen = () => {
+    if (user?.email) {
+      bookingService.getByUserEmail(user.email).then(setBookings);
+    }
     navigateTo('bookings', null);
   };
 

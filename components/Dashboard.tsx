@@ -31,6 +31,7 @@ type DashboardBooking = Booking & {
   customerName?: string;
   customerEmail?: string;
   courtCount?: number;
+  userId?: string | null;
 };
 
 type SelectedBookedCell = {
@@ -166,6 +167,7 @@ export default function Dashboard({
         customerName: b.customer_name || '',
         customerEmail: b.customer_email || '',
         courtCount: Number(b.court_count || 1),
+        userId: b.user_id || null,
       }));
       setVenueBookings(mapped);
     } else if (error) {
@@ -521,15 +523,21 @@ export default function Dashboard({
 
         if (remainingCourts.length === 0) {
           const newLabel = `${slotRange} · Court ${targetMoveCourt}`;
-          const { error } = await supabase
+          const { data: updatedRows, error } = await supabase
             .from('bookings')
             .update({
               time_slot: newLabel,
               booking_time: newLabel,
             })
-            .eq(updateFilter.col, updateFilter.val);
+            .eq(updateFilter.col, updateFilter.val)
+            .select('id');
 
           if (error) throw error;
+          if (!updatedRows || updatedRows.length === 0) {
+            throw new Error(
+              'Database permission (RLS) blocked updating this player booking.'
+            );
+          }
         } else {
           const remainingLabel =
             remainingCourts.length === 1
@@ -543,7 +551,7 @@ export default function Dashboard({
           const remainingPrice = Math.round(unitPrice * remainingCourts.length * 100) / 100;
           const movedPrice = Math.round(unitPrice * cells.length * 100) / 100;
 
-          const { error: updateErr } = await supabase
+          const { data: updatedRows, error: updateErr } = await supabase
             .from('bookings')
             .update({
               time_slot: remainingLabel,
@@ -552,26 +560,35 @@ export default function Dashboard({
               price: remainingPrice,
               total_amount: remainingPrice,
             })
-            .eq(updateFilter.col, updateFilter.val);
+            .eq(updateFilter.col, updateFilter.val)
+            .select('id');
 
           if (updateErr) throw updateErr;
+          if (!updatedRows || updatedRows.length === 0) {
+            throw new Error(
+              'Database permission (RLS) blocked updating this player booking.'
+            );
+          }
 
-          const rpcRes = await bookingService.createViaRPC({
-            venueId: selectedVenue.id,
-            venueName: selectedVenue.name,
+          const newCode = `MTN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+          const { error: insertErr } = await supabase.from('bookings').insert({
+            booking_code: newCode,
+            venue_id: selectedVenue.id,
+            venue_name: selectedVenue.name,
             sport: booking.sport || selectedVenue.sport || 'Badminton',
-            date: booking.date,
-            timeSlot: `${slotRange} · Court ${targetMoveCourt}`,
-            courtCount: 1,
-            totalPrice: movedPrice,
-            customerName: booking.customerName || 'Player',
-            customerEmail: booking.customerEmail || user?.email || 'frontdesk@motion.app',
-            totalCourts: Number(totalCourts),
+            booking_date: booking.date,
+            booking_time: `${slotRange} · Court ${targetMoveCourt}`,
+            time_slot: `${slotRange} · Court ${targetMoveCourt}`,
+            court_count: 1,
+            price: movedPrice,
+            total_amount: movedPrice,
+            status: 'Confirmed',
+            customer_name: booking.customerName || 'Player',
+            customer_email: booking.customerEmail || '',
+            user_id: booking.userId || null,
           });
 
-          if (!rpcRes.success) {
-            throw new Error(rpcRes.error || 'Failed to assign moved court.');
-          }
+          if (insertErr) throw insertErr;
         }
       }
 
