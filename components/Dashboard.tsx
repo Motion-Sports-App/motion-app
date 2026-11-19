@@ -19,6 +19,7 @@ import {
   TrendingUp,
   PlusCircle,
   X,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
@@ -30,6 +31,13 @@ type DashboardBooking = Booking & {
   customerName?: string;
   customerEmail?: string;
   courtCount?: number;
+};
+
+type SelectedBookedCell = {
+  key: string;
+  court: number;
+  time: string;
+  booking: DashboardBooking;
 };
 
 const DEFAULT_HOURS = [
@@ -54,6 +62,9 @@ const toFullSlotLabel = (startHourStr: string) => {
   return `${String(hr).padStart(2, '0')}:00 - ${String(nextHr).padStart(2, '0')}:00`;
 };
 
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default function Dashboard({
   user,
   bookings,
@@ -77,13 +88,20 @@ export default function Dashboard({
   const [isSaving, setIsSaving] = useState(false);
   const [showVenueStats, setShowVenueStats] = useState(false);
 
-  // Front-Desk "Book Court" Mode States
+  // Front-Desk "Book Court" Mode States (for selecting open white slots)
   const [isBookingMode, setIsBookingMode] = useState(false);
   const [selectedSlots, setSelectedSlots] = useState<
     { court: number; time: string }[]
   >([]);
   const [walkInName, setWalkInName] = useState('');
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+
+  // Multi-select state for red/booked slots (for bulk cancel or moving courts)
+  const [selectedBookedCells, setSelectedBookedCells] = useState<
+    SelectedBookedCell[]
+  >([]);
+  const [targetMoveCourt, setTargetMoveCourt] = useState<number>(1);
+  const [isProcessingBookedAction, setIsProcessingBookedAction] = useState(false);
 
   // Live venue bookings mapped from Supabase `bookings` columns
   const [venueBookings, setVenueBookings] = useState<DashboardBooking[]>(
@@ -93,9 +111,11 @@ export default function Dashboard({
   const isSuperAdmin = useMemo(() => {
     return Boolean(
       user?.email &&
-        ['mingtan0403@gmail.com', 'motionsportsapp@gmail.com', 'kvorakijkamjorn@gmail.com'].includes(
-          user.email.toLowerCase()
-        )
+        [
+          'mingtan0403@gmail.com',
+          'motionsportsapp@gmail.com',
+          'kvorakijkamjorn@gmail.com',
+        ].includes(user.email.toLowerCase())
     );
   }, [user]);
 
@@ -268,6 +288,33 @@ export default function Dashboard({
     return map;
   }, [venueBookings, selectedDate, totalCourts]);
 
+  // Determine which courts are conflict-free across all currently selected booked slots
+  const validMoveCourts = useMemo(() => {
+    if (selectedBookedCells.length === 0) return [];
+    const selectedKeys = new Set(selectedBookedCells.map((c) => c.key));
+
+    const available: number[] = [];
+    for (let c = 1; c <= totalCourts; c++) {
+      const hasConflict = selectedBookedCells.some((cell) => {
+        const targetKey = `C${c}_${cell.time}`;
+        return Boolean(bookedCellMap[targetKey]) && !selectedKeys.has(targetKey);
+      });
+      if (!hasConflict) {
+        available.push(c);
+      }
+    }
+    return available;
+  }, [selectedBookedCells, totalCourts, bookedCellMap]);
+
+  useEffect(() => {
+    if (validMoveCourts.length > 0 && !validMoveCourts.includes(targetMoveCourt)) {
+      const differentCourt = validMoveCourts.find(
+        (c) => !selectedBookedCells.every((cell) => cell.court === c)
+      );
+      setTargetMoveCourt(differentCourt ?? validMoveCourts[0]);
+    }
+  }, [validMoveCourts, targetMoveCourt, selectedBookedCells]);
+
   const stats = useMemo(() => {
     const active = venueBookings.filter((b) => b.status === 'Confirmed');
     const cancelled = venueBookings.filter((b) => b.status === 'Cancelled');
@@ -289,22 +336,26 @@ export default function Dashboard({
     };
   }, [venueBookings, ownedVenues, totalCourts, activeHours, bookedCellMap]);
 
-  const handleCellClick = async (courtNum: number, time: string) => {
+  const handleCellClick = (courtNum: number, time: string) => {
     const cellKey = `C${courtNum}_${time}`;
     const existingBooking = bookedCellMap[cellKey];
 
+    // Clicking a red/booked slot toggles selection instead of opening an immediate popup
     if (existingBooking) {
-      if (isBookingMode) return;
-      const guestLabel =
-        existingBooking.customerName ||
-        existingBooking.customerEmail ||
-        'Walk-in';
-      const confirmRelease = window.confirm(
-        `Court ${courtNum} at ${time} is booked by ${guestLabel}. Cancel and release this slot?`
-      );
-      if (confirmRelease) {
-        await handleCancelReservation(existingBooking);
+      if (isBookingMode) {
+        setIsBookingMode(false);
+        setSelectedSlots([]);
       }
+      setSelectedBookedCells((prev) => {
+        const exists = prev.some((c) => c.key === cellKey);
+        if (exists) {
+          return prev.filter((c) => c.key !== cellKey);
+        }
+        return [
+          ...prev,
+          { key: cellKey, court: courtNum, time, booking: existingBooking },
+        ];
+      });
       return;
     }
 
@@ -386,6 +437,151 @@ export default function Dashboard({
 
     if (onCancel) {
       onCancel(booking.id);
+    }
+  };
+
+  const handleBulkCancelSelected = async () => {
+    if (selectedBookedCells.length === 0) return;
+
+    const uniqueBookings = Array.from(
+      new Map(
+        selectedBookedCells.map((c) => [c.booking.dbId || c.booking.id, c.booking])
+      ).values()
+    );
+
+    setIsProcessingBookedAction(true);
+    try {
+      const targetIds = new Set(uniqueBookings.map((b) => b.dbId || b.id));
+
+      setVenueBookings((prev) =>
+        prev.map((b) =>
+          targetIds.has(b.dbId || b.id) ? { ...b, status: 'Cancelled' } : b
+        )
+      );
+
+      const results = await Promise.all(
+        uniqueBookings.map((b) => bookingService.cancel(b.dbId || b.id))
+      );
+
+      if (results.some((ok) => !ok)) {
+        alert(
+          'One or more bookings could not be cancelled in Supabase. Check your bookings UPDATE policy.'
+        );
+      } else if (onCancel) {
+        uniqueBookings.forEach((b) => onCancel(b.id));
+      }
+
+      setSelectedBookedCells([]);
+      await fetchVenueBookings();
+    } finally {
+      setIsProcessingBookedAction(false);
+    }
+  };
+
+  const handleMoveSelectedToCourt = async () => {
+    if (selectedBookedCells.length === 0 || !selectedVenue) return;
+
+    setIsProcessingBookedAction(true);
+    try {
+      const cellsByBooking = new Map<string, SelectedBookedCell[]>();
+      selectedBookedCells.forEach((cell) => {
+        const bKey = cell.booking.dbId || cell.booking.id;
+        const arr = cellsByBooking.get(bKey) || [];
+        arr.push(cell);
+        cellsByBooking.set(bKey, arr);
+      });
+
+      for (const [, cells] of cellsByBooking.entries()) {
+        const booking = cells[0].booking;
+        const rawTime = String(booking.time || '');
+        const slotRange =
+          rawTime.match(/\d{2}:\d{2}\s*[-–]\s*\d{2}:\d{2}/)?.[0] ||
+          toFullSlotLabel(cells[0].time);
+
+        const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
+        const existingCourts = courtListMatch
+          ? courtListMatch[1]
+              .split(',')
+              .map((n) => parseInt(n.trim(), 10))
+              .filter((n) => !isNaN(n))
+          : Array.from(
+              { length: Math.max(1, Number(booking.courtCount || 1)) },
+              (_, idx) => idx + 1
+            );
+
+        const movedFromCourts = new Set(cells.map((c) => c.court));
+        const remainingCourts = existingCourts.filter(
+          (c) => !movedFromCourts.has(c)
+        );
+
+        const updateFilter =
+          booking.dbId && (UUID_REGEX.test(booking.dbId) || /^\d+$/.test(booking.dbId))
+            ? { col: 'id', val: booking.dbId }
+            : { col: 'booking_code', val: booking.id };
+
+        if (remainingCourts.length === 0) {
+          const newLabel = `${slotRange} · Court ${targetMoveCourt}`;
+          const { error } = await supabase
+            .from('bookings')
+            .update({
+              time_slot: newLabel,
+              booking_time: newLabel,
+            })
+            .eq(updateFilter.col, updateFilter.val);
+
+          if (error) throw error;
+        } else {
+          const remainingLabel =
+            remainingCourts.length === 1
+              ? `${slotRange} · Court ${remainingCourts[0]}`
+              : `${slotRange} · Courts ${remainingCourts.join(', ')}`;
+
+          const unitPrice =
+            existingCourts.length > 0
+              ? Number(booking.price || 0) / existingCourts.length
+              : Number(booking.price || 0);
+          const remainingPrice = Math.round(unitPrice * remainingCourts.length * 100) / 100;
+          const movedPrice = Math.round(unitPrice * cells.length * 100) / 100;
+
+          const { error: updateErr } = await supabase
+            .from('bookings')
+            .update({
+              time_slot: remainingLabel,
+              booking_time: remainingLabel,
+              court_count: remainingCourts.length,
+              price: remainingPrice,
+              total_amount: remainingPrice,
+            })
+            .eq(updateFilter.col, updateFilter.val);
+
+          if (updateErr) throw updateErr;
+
+          const rpcRes = await bookingService.createViaRPC({
+            venueId: selectedVenue.id,
+            venueName: selectedVenue.name,
+            sport: booking.sport || selectedVenue.sport || 'Badminton',
+            date: booking.date,
+            timeSlot: `${slotRange} · Court ${targetMoveCourt}`,
+            courtCount: 1,
+            totalPrice: movedPrice,
+            customerName: booking.customerName || 'Player',
+            customerEmail: booking.customerEmail || user?.email || 'frontdesk@motion.app',
+            totalCourts: Number(totalCourts),
+          });
+
+          if (!rpcRes.success) {
+            throw new Error(rpcRes.error || 'Failed to assign moved court.');
+          }
+        }
+      }
+
+      setSelectedBookedCells([]);
+      await fetchVenueBookings();
+    } catch (err: any) {
+      console.error('Error moving bookings:', err);
+      alert(`Could not move booking: ${err.message}`);
+    } finally {
+      setIsProcessingBookedAction(false);
     }
   };
 
@@ -471,6 +667,7 @@ export default function Dashboard({
                 setIsEditingConfig(false);
                 setIsBookingMode(false);
                 setSelectedSlots([]);
+                setSelectedBookedCells([]);
               }}
               className="rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-bold outline-none"
             >
@@ -520,7 +717,7 @@ export default function Dashboard({
                   <p className="mt-0.5 text-xs text-black/50">
                     {isBookingMode
                       ? 'Select one or more open white slots below, then confirm to book.'
-                      : 'White = Available · Red = Booked (click a red slot to cancel).'}
+                      : 'White = Available · Red = Booked (click red slots to select, move, or cancel).'}
                   </p>
                 </div>
 
@@ -533,6 +730,7 @@ export default function Dashboard({
                       onChange={(e) => {
                         setSelectedDate(e.target.value);
                         setSelectedSlots([]);
+                        setSelectedBookedCells([]);
                       }}
                       className="bg-transparent outline-none"
                     />
@@ -543,6 +741,7 @@ export default function Dashboard({
                     type="button"
                     onClick={() => {
                       if (isEditingConfig) setIsEditingConfig(false);
+                      setSelectedBookedCells([]);
                       setIsBookingMode((prev) => {
                         if (prev) setSelectedSlots([]);
                         return !prev;
@@ -573,6 +772,7 @@ export default function Dashboard({
                         setIsBookingMode(false);
                         setSelectedSlots([]);
                       }
+                      setSelectedBookedCells([]);
                       if (isEditingConfig) {
                         handleSaveConfig();
                       } else {
@@ -600,6 +800,99 @@ export default function Dashboard({
                   </button>
                 </div>
               </div>
+
+              {/* SELECTED BOOKED SLOTS ACTION BAR (MOVE OR CANCEL) */}
+              {selectedBookedCells.length > 0 && (
+                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                    <span className="rounded-lg bg-red-600 px-2.5 py-1 font-black text-white">
+                      {selectedBookedCells.length} Booked{' '}
+                      {selectedBookedCells.length === 1 ? 'Slot' : 'Slots'} Selected
+                    </span>
+                    <span className="font-semibold text-black/70">
+                      {Array.from(
+                        new Set(
+                          selectedBookedCells.map(
+                            (c) =>
+                              c.booking.customerName ||
+                              c.booking.customerEmail ||
+                              'Walk-in'
+                          )
+                        )
+                      ).join(', ')}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Move to another court */}
+                    <div className="flex items-center gap-1.5 rounded-xl border border-black/15 bg-white px-2.5 py-1 text-xs font-bold">
+                      <ArrowRightLeft size={13} className="text-black/50" />
+                      <span className="text-black/60">Move to:</span>
+                      <select
+                        value={targetMoveCourt}
+                        disabled={
+                          isProcessingBookedAction || validMoveCourts.length === 0
+                        }
+                        onChange={(e) => setTargetMoveCourt(Number(e.target.value))}
+                        className="bg-transparent font-extrabold text-black outline-none"
+                      >
+                        {Array.from({ length: totalCourts }).map((_, idx) => {
+                          const cNum = idx + 1;
+                          const canMoveHere = validMoveCourts.includes(cNum);
+                          return (
+                            <option
+                              key={cNum}
+                              value={cNum}
+                              disabled={!canMoveHere}
+                            >
+                              Court {cNum} {!canMoveHere ? '(Occupied)' : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={
+                          isProcessingBookedAction ||
+                          validMoveCourts.length === 0 ||
+                          selectedBookedCells.every(
+                            (c) => c.court === targetMoveCourt
+                          )
+                        }
+                        onClick={handleMoveSelectedToCourt}
+                        className="ml-1 rounded-lg bg-[#101310] px-3 py-1 text-[11px] font-black text-[#d8ff3e] transition hover:bg-black/85 disabled:opacity-40"
+                      >
+                        {isProcessingBookedAction ? 'Moving...' : 'Move'}
+                      </button>
+                    </div>
+
+                    {/* Bulk cancel */}
+                    <button
+                      type="button"
+                      disabled={isProcessingBookedAction}
+                      onClick={handleBulkCancelSelected}
+                      className="flex items-center gap-1 rounded-xl bg-red-600 px-3.5 py-1.5 text-xs font-black text-white transition hover:bg-red-700 disabled:opacity-40"
+                    >
+                      {isProcessingBookedAction ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <XCircle size={13} />
+                      )}
+                      Cancel Selected ({selectedBookedCells.length})
+                    </button>
+
+                    {/* Clear selection */}
+                    <button
+                      type="button"
+                      disabled={isProcessingBookedAction}
+                      onClick={() => setSelectedBookedCells([])}
+                      className="rounded-xl border border-black/15 bg-white px-2.5 py-1.5 text-xs font-bold text-black/60 hover:text-black"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* FRONT-DESK BOOKING CHECKOUT BAR */}
               {isBookingMode && (
@@ -641,7 +934,7 @@ export default function Dashboard({
               )}
 
               {/* COURTS & HOURS CONFIG BAR */}
-              {!isBookingMode && (
+              {!isBookingMode && selectedBookedCells.length === 0 && (
                 <div
                   className={`mt-3 flex flex-wrap items-center gap-6 rounded-xl px-3 py-2 text-xs font-bold transition ${
                     isEditingConfig
@@ -739,9 +1032,13 @@ export default function Dashboard({
                         </td>
                         {Array.from({ length: totalCourts }).map((_, i) => {
                           const courtNum = i + 1;
-                          const booking = bookedCellMap[`C${courtNum}_${time}`];
+                          const cellKey = `C${courtNum}_${time}`;
+                          const booking = bookedCellMap[cellKey];
                           const isBooked = Boolean(booking);
-                          const isSelected = selectedSlots.some(
+                          const isBookedSelected = selectedBookedCells.some(
+                            (c) => c.key === cellKey
+                          );
+                          const isOpenSelected = selectedSlots.some(
                             (s) => s.court === courtNum && s.time === time
                           );
                           const guestName =
@@ -759,24 +1056,28 @@ export default function Dashboard({
                                 onClick={() => handleCellClick(courtNum, time)}
                                 title={
                                   isBooked
-                                    ? `Booked (${guestName})`
+                                    ? isBookedSelected
+                                      ? `Selected (${guestName}) — click to unselect`
+                                      : `Booked (${guestName}) — click to select`
                                     : isBookingMode
-                                    ? isSelected
+                                    ? isOpenSelected
                                       ? 'Selected — click to unselect'
                                       : 'Click to select slot'
                                     : 'Available (click "Book Court" to book)'
                                 }
-                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors ${
+                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors cursor-pointer ${
                                   isBooked
-                                    ? 'bg-red-500 text-white hover:bg-red-600'
-                                    : isSelected
+                                    ? isBookedSelected
+                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black'
+                                      : 'bg-red-500 text-white hover:bg-red-600'
+                                    : isOpenSelected
                                     ? 'bg-[#d8ff3e] text-black ring-1 ring-inset ring-black/40'
                                     : isBookingMode
-                                    ? 'bg-white hover:bg-[#eef7cf] cursor-pointer'
+                                    ? 'bg-white hover:bg-[#eef7cf]'
                                     : 'bg-white cursor-default'
                                 }`}
                               >
-                                {isSelected && '✓'}
+                                {(isBookedSelected || isOpenSelected) && '✓'}
                               </button>
                             </td>
                           );
