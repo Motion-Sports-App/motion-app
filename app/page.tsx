@@ -340,12 +340,12 @@ export default function Home() {
                 <Sparkles size={14} className="text-[#829e12]" /> ONE HOME FOR EVERY GAME
               </div>
               <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em]">
-                Find your<br />
+                What&apos;s the<br />
                 <span className="relative inline-block">
-                  court<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
+                  move<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
                 </span>
-                <span className="relative z-10">. Find your</span><br />
-                <span className="text-[#849c24]">people.</span>
+                <span className="relative z-10">?</span><br />
+                <span className="text-[#849c24]">Motion.</span>
               </h1>
               <p className="mt-7 max-w-lg text-base leading-7 text-black/60 sm:text-lg">
                 From quick rallies to full-court battles. Discover and book the space where your next favourite game happens.
