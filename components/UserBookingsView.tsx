@@ -78,32 +78,32 @@ export default function UserBookingsView({
     <section className="mx-auto min-h-[75vh] max-w-4xl px-5 py-10 lg:px-8 lg:py-16">
       <button
         onClick={onBack}
-        className="mb-7 flex items-center gap-2 text-sm font-bold text-black/55 hover:text-black transition"
+        className="mb-7 flex items-center gap-2 text-sm font-bold text-black/55 dark:text-[#F7F8F4]/60 hover:text-black dark:hover:text-[#F7F8F4] transition"
       >
         <ArrowLeft size={17} /> Back to discovery
       </button>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">PLAYER ACCOUNT</p>
-          <h1 className="mt-1 text-4xl font-black tracking-[-.06em]">My Bookings</h1>
-          <p className="mt-1 text-sm text-black/55">Manage your active reservations and game history.</p>
+          <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d] dark:text-[#d8ff3e]">PLAYER ACCOUNT</p>
+          <h1 className="mt-1 text-4xl font-black tracking-[-.06em] text-[#101310] dark:text-[#F7F8F4]">My Bookings</h1>
+          <p className="mt-1 text-sm text-black/55 dark:text-[#F7F8F4]/60">Manage your active reservations and game history.</p>
         </div>
         {user && (
-          <span className="self-start sm:self-auto rounded-full bg-[#eef7cf] px-4 py-2 text-xs font-black text-[#586c12] border border-[#d2e896]">
+          <span className="self-start sm:self-auto rounded-full bg-[#eef7cf] dark:bg-[#d8ff3e]/15 px-4 py-2 text-xs font-black text-[#586c12] dark:text-[#d8ff3e] border border-[#d2e896] dark:border-[#d8ff3e]/30">
             ⚡ Points: {totalPoints} PTS
           </span>
         )}
       </div>
 
       {/* TABS */}
-      <div className="mt-8 flex gap-3 border-b border-black/10 pb-3">
+      <div className="mt-8 flex gap-3 border-b border-black/10 dark:border-white/10 pb-3">
         <button
           onClick={() => setActiveTab('upcoming')}
           className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
             activeTab === 'upcoming'
-              ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-              : 'bg-white text-black/60 hover:bg-black/5 border border-black/10'
+              ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+              : 'bg-white dark:bg-[#16171A] text-black/60 dark:text-[#F7F8F4]/70 hover:bg-black/5 dark:hover:bg-white/10 border border-black/10 dark:border-white/10'
           }`}
         >
           <CheckCircle2 size={15} />
@@ -117,8 +117,8 @@ export default function UserBookingsView({
           }}
           className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
             activeTab === 'past'
-              ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-              : 'bg-white text-black/60 hover:bg-black/5 border border-black/10'
+              ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+              : 'bg-white dark:bg-[#16171A] text-black/60 dark:text-[#F7F8F4]/70 hover:bg-black/5 dark:hover:bg-white/10 border border-black/10 dark:border-white/10'
           }`}
         >
           <History size={15} />
@@ -127,10 +127,10 @@ export default function UserBookingsView({
       </div>
 
       {/* BOOKINGS LIST */}
-      <div className="mt-6 overflow-hidden rounded-2xl border border-black/10 bg-white">
+      <div className="mt-6 overflow-hidden rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A]">
         {displayedList.length > 0 ? (
           <>
-            <div className="divide-y divide-black/5">
+            <div className="divide-y divide-black/5 dark:divide-white/10">
               {displayedList.map((b) => {
                 const isPast = isBookingPast(b.date, b.time);
                 const isCancelled = b.status === 'Cancelled';
@@ -139,17 +139,17 @@ export default function UserBookingsView({
                   <div key={b.id} className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d]">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#81971d] dark:text-[#d8ff3e]">
                           {b.sport}
                         </span>
                         {isPast && !isCancelled && (
-                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[9px] font-bold text-gray-500">
+                          <span className="rounded-full bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-[9px] font-bold text-gray-500 dark:text-[#F7F8F4]/60">
                             Completed
                           </span>
                         )}
                       </div>
-                      <p className="font-extrabold text-base text-black mt-0.5">{b.venue}</p>
-                      <p className="mt-1 text-xs text-black/50">
+                      <p className="font-extrabold text-base text-[#101310] dark:text-[#F7F8F4] mt-0.5">{b.venue}</p>
+                      <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
                         {b.date} · {b.time} · Ref: <span className="font-mono">{b.id}</span>
                       </p>
                     </div>
@@ -158,20 +158,20 @@ export default function UserBookingsView({
                       <span
                         className={`rounded-full px-3 py-1 text-[10px] font-black ${
                           isCancelled
-                            ? 'bg-red-100 text-red-600'
+                            ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
                             : isPast
-                            ? 'bg-gray-100 text-gray-600'
-                            : 'bg-[#edf5d2] text-[#5d7112]'
+                            ? 'bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-[#F7F8F4]/70'
+                            : 'bg-[#edf5d2] dark:bg-[#d8ff3e]/20 text-[#5d7112] dark:text-[#d8ff3e]'
                         }`}
                       >
                         {isCancelled ? 'Cancelled' : isPast ? 'Completed' : 'Confirmed'}
                       </span>
-                      <b className="text-sm">{money(b.price)}</b>
+                      <b className="text-sm text-[#101310] dark:text-[#F7F8F4]">{money(b.price)}</b>
 
                       {b.status === 'Confirmed' && !isPast && (
                         <button
                           onClick={() => onCancel(b.id)}
-                          className="text-xs font-bold text-red-600 underline ml-2 hover:text-red-800 transition"
+                          className="text-xs font-bold text-red-600 dark:text-red-400 underline ml-2 hover:text-red-800 dark:hover:text-red-300 transition"
                         >
                           Cancel
                         </button>
@@ -184,10 +184,10 @@ export default function UserBookingsView({
 
             {/* LOAD MORE BUTTON */}
             {hasMorePast && (
-              <div className="p-4 text-center border-t border-black/5 bg-[#f7f8f4]">
+              <div className="p-4 text-center border-t border-black/5 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C]">
                 <button
                   onClick={() => setPastLimit((prev) => prev + 5)}
-                  className="inline-flex items-center gap-2 rounded-full border border-black/15 bg-white px-5 py-2 text-xs font-bold text-black transition hover:bg-black/5"
+                  className="inline-flex items-center gap-2 rounded-full border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-5 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] transition hover:bg-black/5 dark:hover:bg-white/10"
                 >
                   Load More <ChevronDown size={14} />
                 </button>
@@ -196,11 +196,11 @@ export default function UserBookingsView({
           </>
         ) : (
           <div className="p-12 text-center">
-            <CalendarDays className="mx-auto text-black/25" size={32} />
-            <p className="mt-3 font-extrabold text-lg">
+            <CalendarDays className="mx-auto text-black/25 dark:text-[#F7F8F4]/30" size={32} />
+            <p className="mt-3 font-extrabold text-lg text-[#101310] dark:text-[#F7F8F4]">
               {activeTab === 'upcoming' ? 'No upcoming bookings' : 'No past bookings'}
             </p>
-            <p className="mt-1 text-sm text-black/45">
+            <p className="mt-1 text-sm text-black/45 dark:text-[#F7F8F4]/60">
               {activeTab === 'upcoming'
                 ? 'Explore available courts and lock in your next session!'
                 : 'Your completed or cancelled reservations will show up here.'}
@@ -208,7 +208,7 @@ export default function UserBookingsView({
             {activeTab === 'upcoming' && (
               <button
                 onClick={onBack}
-                className="mt-5 rounded-full bg-[#101310] px-6 py-3 text-xs font-bold text-white hover:bg-[#30372a] transition"
+                className="mt-5 rounded-full bg-[#101310] dark:bg-[#d8ff3e] px-6 py-3 text-xs font-bold text-white dark:text-[#101310] hover:bg-[#30372a] dark:hover:bg-[#c9f02e] transition"
               >
                 Find a court
               </button>

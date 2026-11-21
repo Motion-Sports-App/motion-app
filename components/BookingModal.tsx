@@ -128,7 +128,7 @@ export default function BookingModal({
   if (fetchingAuth) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div className="rounded-2xl bg-white p-6 shadow-xl text-center text-sm font-semibold">
+        <div className="rounded-2xl border border-transparent dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-xl text-center text-sm font-semibold text-[#101310] dark:text-[#F7F8F4]">
           Loading reservation...
         </div>
       </div>
@@ -137,33 +137,33 @@ export default function BookingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl transition-all">
+      <div className="w-full max-w-md rounded-3xl border border-transparent dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-xl transition-all">
         {isSuccess ? (
           <div className="text-center py-4 space-y-4">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#d8ff3e]">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[#d8ff3e] text-[#101310]">
               <span className="text-2xl font-bold">✓</span>
             </div>
 
-            <h3 className="text-2xl font-black text-black">Booking Confirmed!</h3>
-            <p className="text-xs text-gray-500">
+            <h3 className="text-2xl font-black text-[#101310] dark:text-[#F7F8F4]">Booking Confirmed!</h3>
+            <p className="text-xs text-gray-500 dark:text-[#F7F8F4]/60">
               Your reservation has been locked in successfully.
             </p>
 
-            <div className="my-4 rounded-2xl bg-gray-50 p-4 text-xs space-y-2 text-left">
-              <div className="flex justify-between border-b border-gray-200 pb-2">
-                <span className="text-gray-500">Booking Reference:</span>
-                <span className="font-extrabold text-black font-mono text-sm">{confirmedCode}</span>
+            <div className="my-4 rounded-2xl border border-transparent dark:border-white/10 bg-gray-50 dark:bg-[#0B0B0C] p-4 text-xs space-y-2 text-left">
+              <div className="flex justify-between border-b border-gray-200 dark:border-white/10 pb-2">
+                <span className="text-gray-500 dark:text-[#F7F8F4]/60">Booking Reference:</span>
+                <span className="font-extrabold text-[#101310] dark:text-[#F7F8F4] font-mono text-sm">{confirmedCode}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Venue / Item:</span>
-                <span className="font-bold text-black">{bookingDetails.itemName}</span>
+                <span className="text-gray-500 dark:text-[#F7F8F4]/60">Venue / Item:</span>
+                <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">{bookingDetails.itemName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Date & Time:</span>
-                <span className="font-bold text-black">{formattedDate} @ {bookingDetails.timeSlot}</span>
+                <span className="text-gray-500 dark:text-[#F7F8F4]/60">Date & Time:</span>
+                <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">{formattedDate} @ {bookingDetails.timeSlot}</span>
               </div>
               {user && (
-                <div className="flex justify-between text-[#22c55e] font-bold pt-1">
+                <div className="flex justify-between text-[#22c55e] dark:text-[#d8ff3e] font-bold pt-1">
                   <span>Points Earned:</span>
                   <span>+{pointsToEarn} PTS</span>
                 </div>
@@ -173,108 +173,108 @@ export default function BookingModal({
             <button
               type="button"
               onClick={handleClose}
-              className="w-full rounded-full bg-black py-3.5 text-sm font-black text-white hover:bg-gray-800 transition"
+              className="w-full rounded-full bg-[#101310] dark:bg-[#d8ff3e] py-3.5 text-sm font-black text-white dark:text-[#101310] hover:bg-gray-800 dark:hover:bg-[#c9f02e] transition"
             >
               Done
             </button>
           </div>
         ) : (
           <>
-            <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+            <div className="flex items-start justify-between border-b border-gray-100 dark:border-white/10 pb-4">
               <div>
-                <h3 className="text-xl font-black text-black">Confirm Reservation</h3>
-                <p className="text-sm font-bold text-gray-500">
+                <h3 className="text-xl font-black text-[#101310] dark:text-[#F7F8F4]">Confirm Reservation</h3>
+                <p className="text-sm font-bold text-gray-500 dark:text-[#F7F8F4]/60">
                   {bookingDetails.itemName} — {formatTHB(bookingPrice)}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleClose}
-                className="rounded-full bg-gray-100 p-2 text-xs font-bold text-gray-500 hover:bg-gray-200 hover:text-black transition"
+                className="rounded-full bg-gray-100 dark:bg-[#0B0B0C] p-2 text-xs font-bold text-gray-500 dark:text-[#F7F8F4]/60 hover:bg-gray-200 dark:hover:bg-white/10 hover:text-black dark:hover:text-[#F7F8F4] transition"
               >
                 ✕
               </button>
             </div>
 
-            <div className="my-4 rounded-2xl bg-gray-50 p-3.5 text-xs text-gray-700 space-y-1">
+            <div className="my-4 rounded-2xl border border-transparent dark:border-white/10 bg-gray-50 dark:bg-[#0B0B0C] p-3.5 text-xs text-gray-700 dark:text-[#F7F8F4]/80 space-y-1">
               <div className="flex justify-between">
-                <span className="text-gray-500">Date:</span>
-                <span className="font-bold text-black">{formattedDate}</span>
+                <span className="text-gray-500 dark:text-[#F7F8F4]/60">Date:</span>
+                <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">{formattedDate}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Time Slot:</span>
-                <span className="font-bold text-black">{bookingDetails.timeSlot}</span>
+                <span className="text-gray-500 dark:text-[#F7F8F4]/60">Time Slot:</span>
+                <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">{bookingDetails.timeSlot}</span>
               </div>
             </div>
 
             <form onSubmit={handleConfirmBooking} className="space-y-4">
               {user ? (
                 <div className="space-y-3">
-                  <div className="rounded-2xl bg-[#d8ff3e]/20 border border-[#d8ff3e] p-3.5 text-xs font-semibold text-black">
+                  <div className="rounded-2xl bg-[#d8ff3e]/20 dark:bg-[#d8ff3e]/15 border border-[#d8ff3e] dark:border-[#d8ff3e]/40 p-3.5 text-xs font-semibold text-[#101310] dark:text-[#F7F8F4]">
                     <div className="flex justify-between items-center">
                       <span>⚡ Member Fast-Checkout</span>
-                      <span className="rounded-full bg-black text-[#d8ff3e] px-2 py-0.5 text-[10px] font-extrabold">
+                      <span className="rounded-full bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] px-2 py-0.5 text-[10px] font-extrabold">
                         + {pointsToEarn} PTS
                       </span>
                     </div>
-                    <p className="mt-1 text-gray-600 text-[11px]">
-                      Logged in as <span className="font-bold text-black">{user.email}</span>
+                    <p className="mt-1 text-gray-600 dark:text-[#F7F8F4]/70 text-[11px]">
+                      Logged in as <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">{user.email}</span>
                     </p>
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full rounded-full bg-[#d8ff3e] py-3.5 text-sm font-black text-black transition hover:bg-[#c9f02e]"
+                    className="w-full rounded-full bg-[#d8ff3e] py-3.5 text-sm font-black text-[#101310] transition hover:bg-[#c9f02e]"
                   >
                     {loading ? 'Processing Reservation...' : `Confirm & Book (${formatTHB(bookingPrice)})`}
                   </button>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  <div className="rounded-2xl bg-gray-100 p-3 text-xs text-gray-600">
-                    💡 <span className="font-bold text-black">Guest Checkout.</span> Fill details to complete reservation.
+                  <div className="rounded-2xl border border-transparent dark:border-white/10 bg-gray-100 dark:bg-[#0B0B0C] p-3 text-xs text-gray-600 dark:text-[#F7F8F4]/70">
+                    💡 <span className="font-bold text-[#101310] dark:text-[#F7F8F4]">Guest Checkout.</span> Fill details to complete reservation.
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700">Booking Name *</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-[#F7F8F4]/70">Booking Name *</label>
                     <input
                       type="text"
                       required
                       value={guestName}
                       onChange={(e) => setGuestName(e.target.value)}
                       placeholder="e.g. Somchai Jaidee"
-                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm text-black outline-none focus:border-black"
+                      className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0B0B0C] p-2.5 text-sm text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-black dark:focus:border-[#d8ff3e]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700">Phone Number *</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-[#F7F8F4]/70">Phone Number *</label>
                     <input
                       type="tel"
                       required
                       value={guestPhone}
                       onChange={(e) => setGuestPhone(e.target.value)}
                       placeholder="081-234-5678"
-                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm text-black outline-none focus:border-black"
+                      className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0B0B0C] p-2.5 text-sm text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-black dark:focus:border-[#d8ff3e]"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-gray-700">Email (Optional)</label>
+                    <label className="block text-xs font-bold text-gray-700 dark:text-[#F7F8F4]/70">Email (Optional)</label>
                     <input
                       type="email"
                       value={guestEmail}
                       onChange={(e) => setGuestEmail(e.target.value)}
                       placeholder="somchai@example.com"
-                      className="mt-1 w-full rounded-xl border border-gray-200 p-2.5 text-sm text-black outline-none focus:border-black"
+                      className="mt-1 w-full rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0B0B0C] p-2.5 text-sm text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-black dark:focus:border-[#d8ff3e]"
                     />
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="mt-2 w-full rounded-full bg-black py-3.5 text-sm font-black text-white transition hover:bg-gray-800"
+                    className="mt-2 w-full rounded-full bg-[#101310] dark:bg-[#d8ff3e] py-3.5 text-sm font-black text-white dark:text-[#101310] transition hover:bg-gray-800 dark:hover:bg-[#c9f02e]"
                   >
                     {loading ? 'Processing Reservation...' : `Confirm & Book (${formatTHB(bookingPrice)})`}
                   </button>

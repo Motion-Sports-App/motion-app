@@ -1,10 +1,52 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body { margin: 0; background: #f7f8f4; color: #101310; font-family: Arial, Helvetica, sans-serif; }
-button, input, select { font: inherit; }
-button { cursor: pointer; }
-::selection { background: #d8ff3e; color: #101310; }
+
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: #f7f8f4;
+  color: #101310;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+html.dark body {
+  background: #0B0B0C;
+  color: #F7F8F4;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+html.dark select option {
+  background: #16171A;
+  color: #F7F8F4;
+}
+
+::selection {
+  background: #d8ff3e;
+  color: #101310;
+}

@@ -273,7 +273,7 @@ export default function VenueModal({
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
       <div className="fixed inset-0 bg-black/60 transition-opacity" onClick={onClose} />
       <div
-        className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl bg-white sm:rounded-3xl shadow-2xl"
+        className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-t-3xl border border-transparent dark:border-white/10 bg-white dark:bg-[#16171A] sm:rounded-3xl shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="relative h-48 sm:h-56">
@@ -281,29 +281,29 @@ export default function VenueModal({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-black hover:bg-white shadow-md"
+            className="absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 dark:bg-[#16171A]/90 text-[#101310] dark:text-[#F7F8F4] hover:bg-white dark:hover:bg-[#16171A] shadow-md"
           >
             <X size={19} />
           </button>
-          <span className="absolute bottom-4 left-4 rounded-full bg-[#d8ff3e] px-3 py-2 text-[10px] font-black tracking-widest text-black">
+          <span className="absolute bottom-4 left-4 rounded-full bg-[#d8ff3e] px-3 py-2 text-[10px] font-black tracking-widest text-[#101310]">
             {venue.sport.toUpperCase()}
           </span>
         </div>
 
         <div className="grid gap-7 p-5 sm:grid-cols-[1fr_1.1fr] sm:p-8">
           <div>
-            <p className="flex items-center gap-1 text-xs font-bold text-black/50">
+            <p className="flex items-center gap-1 text-xs font-bold text-black/50 dark:text-[#F7F8F4]/60">
               <MapPin size={14} />
               {venue.area}
             </p>
-            <h2 className="mt-2 text-3xl font-black tracking-tight text-black">{venue.name}</h2>
-            <div className="mt-2 flex items-center gap-1 text-sm text-black">
+            <h2 className="mt-2 text-3xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">{venue.name}</h2>
+            <div className="mt-2 flex items-center gap-1 text-sm text-[#101310] dark:text-[#F7F8F4]">
               <Star size={15} fill="#d6a927" stroke="#d6a927" />
               <b>{venue.rating || 'New'}</b>
-              <span className="text-black/45">({venue.reviews || 0} reviews)</span>
+              <span className="text-black/45 dark:text-[#F7F8F4]/50">({venue.reviews || 0} reviews)</span>
             </div>
 
-            <p className="mt-4 text-xs leading-5 text-black/60">
+            <p className="mt-4 text-xs leading-5 text-black/60 dark:text-[#F7F8F4]/70">
               {venue.description || 'No description provided.'}
             </p>
 
@@ -312,7 +312,7 @@ export default function VenueModal({
                 href={googleMapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-xl border border-black/10 bg-[#f7f8f4] px-3.5 py-2 text-xs font-bold text-black hover:bg-gray-200 transition"
+                className="inline-flex items-center gap-2 rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3.5 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-200 dark:hover:bg-white/10 transition"
               >
                 Open in Google Maps ↗
               </a>
@@ -320,18 +320,18 @@ export default function VenueModal({
 
             <div className="mt-5 hidden sm:block">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xs font-extrabold text-black uppercase">Address</h3>
+                <h3 className="text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4] uppercase">Address</h3>
                 <a
                   href={googleMapsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-[11px] font-extrabold text-[#758e1b] hover:underline"
+                  className="text-[11px] font-extrabold text-[#758e1b] dark:text-[#d8ff3e] hover:underline"
                 >
                   View larger map ↗
                 </a>
               </div>
-              {venue.address && <p className="mb-2 text-xs text-black/60">{venue.address}</p>}
-              <div className="h-36 w-full overflow-hidden rounded-xl border border-black/10 bg-gray-100">
+              {venue.address && <p className="mb-2 text-xs text-black/60 dark:text-[#F7F8F4]/70">{venue.address}</p>}
+              <div className="h-36 w-full overflow-hidden rounded-xl border border-black/10 dark:border-white/10 bg-gray-100 dark:bg-[#0B0B0C]">
                 <iframe
                   title="Venue Location Map"
                   width="100%"
@@ -344,49 +344,49 @@ export default function VenueModal({
               </div>
             </div>
 
-            <h3 className="mt-5 text-xs font-extrabold text-black uppercase">Facilities</h3>
+            <h3 className="mt-5 text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4] uppercase">Facilities</h3>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {venue.facilities.map((f) => (
-                <span key={f} className="rounded-full bg-[#f2f4ed] px-2.5 py-1 text-[11px] font-semibold text-black">
+                <span key={f} className="rounded-full bg-[#f2f4ed] dark:bg-[#0B0B0C] dark:border dark:border-white/10 px-2.5 py-1 text-[11px] font-semibold text-[#101310] dark:text-[#F7F8F4]">
                   {f}
                 </span>
               ))}
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="rounded-2xl bg-[#f7f8f4] p-5 border border-black/10">
-            <div className="flex items-end justify-between border-b border-black/10 pb-3">
-              <h3 className="text-base font-black text-black">Select Slots</h3>
-              <p className="text-black">
+          <form onSubmit={handleSubmit} className="rounded-2xl bg-[#f7f8f4] dark:bg-[#0B0B0C] p-5 border border-black/10 dark:border-white/10">
+            <div className="flex items-end justify-between border-b border-black/10 dark:border-white/10 pb-3">
+              <h3 className="text-base font-black text-[#101310] dark:text-[#F7F8F4]">Select Slots</h3>
+              <p className="text-[#101310] dark:text-[#F7F8F4]">
                 <b className="text-lg">{money(venue.price)}</b>
-                <span className="text-xs text-black/45">/hr/court</span>
+                <span className="text-xs text-black/45 dark:text-[#F7F8F4]/50">/hr/court</span>
               </p>
             </div>
 
-            <label className="mt-3 block text-xs font-bold text-black/55 uppercase">
+            <label className="mt-3 block text-xs font-bold text-black/55 dark:text-[#F7F8F4]/60 uppercase">
               Date
               <input
                 type="date"
                 value={date}
                 min={dateLabel(today)}
                 onChange={(e) => setDate(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs font-bold text-black outline-none"
+                className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
               />
             </label>
 
             <div className="mt-3">
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-xs font-bold text-black/55 uppercase">Time Slot(s)</span>
+                <span className="text-xs font-bold text-black/55 dark:text-[#F7F8F4]/60 uppercase">Time Slot(s)</span>
                 {loadingAvailability ? (
-                  <span className="text-[10px] text-black/40 font-semibold">Checking...</span>
+                  <span className="text-[10px] text-black/40 dark:text-[#F7F8F4]/50 font-semibold">Checking...</span>
                 ) : (
-                  <span className="text-[10px] font-extrabold text-[#758e1b] bg-[#eef7cf] px-2 py-0.5 rounded-full">
+                  <span className="text-[10px] font-extrabold text-[#758e1b] dark:text-[#d8ff3e] bg-[#eef7cf] dark:bg-[#d8ff3e]/15 px-2 py-0.5 rounded-full">
                     Multi-select active
                   </span>
                 )}
               </div>
 
-              <div className="max-h-40 overflow-y-auto grid grid-cols-2 gap-1.5 p-1 border border-black/10 rounded-xl bg-white">
+              <div className="max-h-40 overflow-y-auto grid grid-cols-2 gap-1.5 p-1 border border-black/10 dark:border-white/10 rounded-xl bg-white dark:bg-[#16171A]">
                 {availableSlots.map((slot) => {
                   const isSelected = selectedSlots.includes(slot);
                   const booked = slotBookings[slot] || 0;
@@ -401,10 +401,10 @@ export default function VenueModal({
                       onClick={() => toggleSlot(slot)}
                       className={`relative rounded-lg py-2 px-2 text-xs font-bold transition text-center flex flex-col items-center justify-center ${
                         isFull
-                          ? 'bg-gray-100 text-gray-400 opacity-50 cursor-not-allowed line-through'
+                          ? 'bg-gray-100 dark:bg-white/5 text-gray-400 dark:text-[#F7F8F4]/30 opacity-50 cursor-not-allowed line-through'
                           : isSelected
-                          ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                          : 'bg-[#f7f8f4] text-black hover:bg-gray-200'
+                          ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+                          : 'bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-200 dark:hover:bg-white/10'
                       }`}
                     >
                       <span>{slot} {isSelected && '✓'}</span>
@@ -417,27 +417,27 @@ export default function VenueModal({
               </div>
             </div>
 
-            <div className="mt-3 border-t border-black/10 pt-3">
+            <div className="mt-3 border-t border-black/10 dark:border-white/10 pt-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <label className="text-xs font-bold text-black/70 uppercase block">Courts</label>
-                  <span className="text-[10px] text-black/40">Max {maxAvailableCourts} for selected time</span>
+                  <label className="text-xs font-bold text-black/70 dark:text-[#F7F8F4]/80 uppercase block">Courts</label>
+                  <span className="text-[10px] text-black/40 dark:text-[#F7F8F4]/50">Max {maxAvailableCourts} for selected time</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     disabled={courtCount <= 1}
                     onClick={() => setCourtCount((prev) => Math.max(1, prev - 1))}
-                    className="h-7 w-7 rounded-lg border border-black/15 bg-white font-extrabold text-xs text-black hover:bg-gray-100 disabled:opacity-40"
+                    className="h-7 w-7 rounded-lg border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] font-extrabold text-xs text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40"
                   >
                     -
                   </button>
-                  <span className="w-5 text-center text-xs font-extrabold text-black">{courtCount}</span>
+                  <span className="w-5 text-center text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4]">{courtCount}</span>
                   <button
                     type="button"
                     disabled={courtCount >= maxAvailableCourts || maxAvailableCourts === 0}
                     onClick={() => setCourtCount((prev) => Math.min(maxAvailableCourts, prev + 1))}
-                    className="h-7 w-7 rounded-lg border border-black/15 bg-white font-extrabold text-xs text-black hover:bg-gray-100 disabled:opacity-40"
+                    className="h-7 w-7 rounded-lg border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] font-extrabold text-xs text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-100 dark:hover:bg-white/10 disabled:opacity-40"
                   >
                     +
                   </button>
@@ -445,25 +445,25 @@ export default function VenueModal({
               </div>
             </div>
 
-            <div className="mt-3 border-t border-black/10 pt-3">
+            <div className="mt-3 border-t border-black/10 dark:border-white/10 pt-3">
               {user ? (
-                <div className="flex items-center justify-between rounded-xl border border-black/10 bg-white px-3 py-2 text-xs">
+                <div className="flex items-center justify-between rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs">
                   <div className="min-w-0 pr-2">
-                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-black/40">Booking as</p>
-                    <p className="truncate font-bold text-black">{user.user_metadata?.full_name || user.email}</p>
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-black/40 dark:text-[#F7F8F4]/50">Booking as</p>
+                    <p className="truncate font-bold text-[#101310] dark:text-[#F7F8F4]">{user.user_metadata?.full_name || user.email}</p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-[#d8ff3e] px-2 py-0.5 text-[10px] font-black text-black">✓ Logged In</span>
+                  <span className="shrink-0 rounded-full bg-[#d8ff3e] px-2 py-0.5 text-[10px] font-black text-[#101310]">✓ Logged In</span>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-black/50">Guest Information</p>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-black/50 dark:text-[#F7F8F4]/60">Guest Information</p>
                   <input
                     type="text"
                     required
                     placeholder="Name *"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:border-black/40"
+                    className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-black/40 dark:focus:border-[#d8ff3e]"
                   />
                   <input
                     type="text"
@@ -471,29 +471,29 @@ export default function VenueModal({
                     placeholder="Email *"
                     value={customerEmail}
                     onChange={(e) => setCustomerEmail(e.target.value)}
-                    className="w-full rounded-xl border border-black/10 bg-white px-3 py-2 text-xs text-black outline-none focus:border-black/40"
+                    className="w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-black/40 dark:focus:border-[#d8ff3e]"
                   />
                 </div>
               )}
             </div>
 
-            {errorMsg && <p className="mt-2 text-xs font-bold text-red-600">{errorMsg}</p>}
+            {errorMsg && <p className="mt-2 text-xs font-bold text-red-600 dark:text-red-400">{errorMsg}</p>}
 
-            <div className="mt-3 rounded-xl bg-[#eef7cf] p-2.5 text-xs text-black space-y-0.5">
-              <div className="flex justify-between font-medium text-[11px] text-black/70">
+            <div className="mt-3 rounded-xl bg-[#eef7cf] dark:bg-[#d8ff3e]/15 dark:border dark:border-[#d8ff3e]/30 p-2.5 text-xs text-[#101310] dark:text-[#F7F8F4] space-y-0.5">
+              <div className="flex justify-between font-medium text-[11px] text-black/70 dark:text-[#F7F8F4]/70">
                 <span>{totalHours} hr(s) × {courtCount} court(s)</span>
                 <span>{money(venue.price)}/hr</span>
               </div>
-              <div className="flex justify-between items-center font-black text-sm pt-0.5 border-t border-black/10">
+              <div className="flex justify-between items-center font-black text-sm pt-0.5 border-t border-black/10 dark:border-white/10">
                 <span>Total Fee</span>
-                <span className="text-base text-black">{money(totalPrice)}</span>
+                <span className="text-base text-[#101310] dark:text-[#d8ff3e]">{money(totalPrice)}</span>
               </div>
             </div>
 
             <button
               type="submit"
               disabled={!isFormValid || submitting}
-              className="mt-3 w-full rounded-full bg-[#d8ff3e] py-3 text-xs font-black text-black transition hover:bg-[#c9f02e] disabled:opacity-50"
+              className="mt-3 w-full rounded-full bg-[#d8ff3e] py-3 text-xs font-black text-[#101310] transition hover:bg-[#c9f02e] disabled:opacity-50"
             >
               {submitting ? 'Processing...' : `Confirm Booking (${money(totalPrice)})`}
             </button>

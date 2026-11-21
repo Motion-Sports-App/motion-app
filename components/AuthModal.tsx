@@ -53,18 +53,25 @@ export default function AuthModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4" role="dialog" aria-modal="true">
-      <div className="relative w-full max-w-md rounded-3xl bg-white p-6 sm:p-8">
-        <button onClick={onClose} className="absolute right-4 top-4 text-black/50 hover:text-black">
+      <div className="relative w-full max-w-md rounded-3xl border border-transparent dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8">
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 text-black/50 dark:text-[#F7F8F4]/50 hover:text-black dark:hover:text-[#F7F8F4]"
+        >
           <X size={20} />
         </button>
-        <h2 className="text-2xl font-black text-black">{isSignUp ? 'Create an account' : 'Welcome back'}</h2>
-        <p className="mt-1 text-xs text-black/50">Save your details for instant 1-click booking.</p>
+        <h2 className="text-2xl font-black text-[#101310] dark:text-[#F7F8F4]">
+          {isSignUp ? 'Create an account' : 'Welcome back'}
+        </h2>
+        <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
+          Save your details for instant 1-click booking.
+        </p>
 
         {/* Google Sign-In Button */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
-          className="mt-5 flex w-full items-center justify-center gap-3 rounded-full border border-black/15 bg-white py-2.5 text-xs font-bold text-black transition hover:bg-black/5"
+          className="mt-5 flex w-full items-center justify-center gap-3 rounded-full border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] py-2.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] transition hover:bg-black/5 dark:hover:bg-white/10"
         >
           <svg className="h-4 w-4" viewBox="0 0 24 24">
             <path
@@ -88,13 +95,17 @@ export default function AuthModal({
         </button>
 
         <div className="relative my-4 text-center">
-          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-black/10"></div></div>
-          <span className="relative bg-white px-3 text-[11px] font-bold text-black/40">OR</span>
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-black/10 dark:border-white/10"></div>
+          </div>
+          <span className="relative bg-white dark:bg-[#16171A] px-3 text-[11px] font-bold text-black/40 dark:text-[#F7F8F4]/40">
+            OR
+          </span>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-3">
           {isSignUp && (
-            <label className="block text-xs font-bold text-black/60">
+            <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70">
               Full Name
               <input
                 type="text"
@@ -102,11 +113,11 @@ export default function AuthModal({
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Alex Tan"
-                className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/40 text-black"
+                className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-3 py-2 text-sm outline-none focus:border-black/40 dark:focus:border-[#d8ff3e] text-[#101310] dark:text-[#F7F8F4] placeholder:text-black/35 dark:placeholder:text-[#F7F8F4]/35"
               />
             </label>
           )}
-          <label className="block text-xs font-bold text-black/60">
+          <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70">
             Email
             <input
               type="email"
@@ -114,10 +125,10 @@ export default function AuthModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="alex@example.com"
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/40 text-black"
+              className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-3 py-2 text-sm outline-none focus:border-black/40 dark:focus:border-[#d8ff3e] text-[#101310] dark:text-[#F7F8F4] placeholder:text-black/35 dark:placeholder:text-[#F7F8F4]/35"
             />
           </label>
-          <label className="block text-xs font-bold text-black/60">
+          <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70">
             Password
             <input
               type="password"
@@ -125,16 +136,16 @@ export default function AuthModal({
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="mt-1 w-full rounded-xl border border-black/10 px-3 py-2 text-sm outline-none focus:border-black/40 text-black"
+              className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-3 py-2 text-sm outline-none focus:border-black/40 dark:focus:border-[#d8ff3e] text-[#101310] dark:text-[#F7F8F4] placeholder:text-black/35 dark:placeholder:text-[#F7F8F4]/35"
             />
           </label>
 
-          {errorMsg && <p className="text-xs font-bold text-red-600">{errorMsg}</p>}
+          {errorMsg && <p className="text-xs font-bold text-red-600 dark:text-red-400">{errorMsg}</p>}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full bg-[#d8ff3e] py-3 text-sm font-black text-black transition hover:bg-[#c9f02e] disabled:opacity-50"
+            className="w-full rounded-full bg-[#d8ff3e] py-3 text-sm font-black text-[#101310] transition hover:bg-[#c9f02e] disabled:opacity-50"
           >
             {loading ? 'Processing...' : isSignUp ? 'Sign Up' : 'Sign In'}
           </button>
@@ -142,7 +153,7 @@ export default function AuthModal({
 
         <button
           onClick={() => setIsSignUp(!isSignUp)}
-          className="mt-4 w-full text-center text-xs font-semibold text-black/60 underline"
+          className="mt-4 w-full text-center text-xs font-semibold text-black/60 dark:text-[#F7F8F4]/60 underline"
         >
           {isSignUp ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
         </button>

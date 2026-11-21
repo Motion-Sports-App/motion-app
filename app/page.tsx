@@ -271,10 +271,10 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen bg-[#f7f8f4] text-[#101310] dark:bg-[#0B0B0C] dark:text-[#F7F8F4] transition-colors">
       {/* STICKY HEADER WRAPPER */}
-      <div className="sticky top-0 z-40 bg-[#f7f8f4]">
-        <div className="bg-[#d8ff3e] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
+      <div className="sticky top-0 z-40 bg-[#f7f8f4] dark:bg-[#16171A] transition-colors">
+        <div className="bg-[#d8ff3e] text-[#101310] px-4 py-2 text-center text-[11px] font-extrabold uppercase tracking-[.18em] sm:text-xs">
           Your next game starts here <span className="mx-2">✳</span> Meet you on the court
         </div>
 
@@ -336,24 +336,24 @@ export default function Home() {
         <>
           <section className="mx-auto grid max-w-7xl gap-9 px-5 pb-14 pt-10 sm:pt-14 lg:grid-cols-[1.02fr_.98fr] lg:items-center lg:px-8 lg:pb-20 lg:pt-16">
             <div className="relative z-10">
-              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-xs font-bold">
-                <Sparkles size={14} className="text-[#829e12]" /> ONE HOME FOR EVERY GAME
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
+                <Sparkles size={14} className="text-[#829e12] dark:text-[#d8ff3e]" /> ONE HOME FOR EVERY GAME
               </div>
-              <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em]">
+              <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em] text-[#101310] dark:text-[#F7F8F4]">
                 Find your<br />
                 <span className="relative inline-block">
-                  court<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
+                  court<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] dark:bg-[#d8ff3e]/35 sm:h-3" />
                 </span>
                 <span className="relative z-10">. Find your</span><br />
-                <span className="text-[#849c24]">people.</span>
+                <span className="text-[#849c24] dark:text-[#d8ff3e]">people.</span>
               </h1>
-              <p className="mt-7 max-w-lg text-base leading-7 text-black/60 sm:text-lg">
+              <p className="mt-7 max-w-lg text-base leading-7 text-black/60 dark:text-[#F7F8F4]/70 sm:text-lg">
                 From quick rallies to full-court battles. Discover and book the space where your next favourite game happens.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <button
                   onClick={() => handleNavigate('explore')}
-                  className="rounded-full bg-[#101310] px-6 py-4 text-sm font-bold text-white transition hover:-translate-y-0.5"
+                  className="rounded-full bg-[#101310] dark:bg-[#d8ff3e] px-6 py-4 text-sm font-bold text-white dark:text-[#101310] transition hover:-translate-y-0.5"
                 >
                   Explore courts <ArrowDownRight className="ml-3 inline" size={17} />
                 </button>
@@ -366,31 +366,31 @@ export default function Home() {
             </div>
           </section>
 
-          <section id="explore" className="bg-white py-16 sm:py-20">
+          <section id="explore" className="bg-white dark:bg-[#0B0B0C] dark:border-t dark:border-white/10 py-16 sm:py-20 transition-colors">
             <div className="mx-auto max-w-7xl px-5 lg:px-8">
               <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
                 <div>
-                  <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">YOUR NEXT SESSION</p>
-                  <h2 className="mt-3 text-4xl font-black tracking-[-.06em] sm:text-5xl">Find your playing field.</h2>
+                  <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d] dark:text-[#d8ff3e]">YOUR NEXT SESSION</p>
+                  <h2 className="mt-3 text-4xl font-black tracking-[-.06em] text-[#101310] dark:text-[#F7F8F4] sm:text-5xl">Find your playing field.</h2>
                 </div>
-                <div className="text-sm font-semibold text-black/50">
+                <div className="text-sm font-semibold text-black/50 dark:text-[#F7F8F4]/60">
                   {filtered.length} courts to explore <ArrowRight className="ml-1 inline" size={16} />
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f4] p-3 md:grid-cols-[1.2fr_1fr_1fr_auto_auto] md:p-4">
-                <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3">
-                  <Search size={18} className="shrink-0 text-black/40" />
+              <div className="mt-8 grid gap-3 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#16171A] p-3 md:grid-cols-[1.2fr_1fr_1fr_auto_auto] md:p-4">
+                <label className="flex items-center gap-3 rounded-xl border border-transparent dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-4 py-3">
+                  <Search size={18} className="shrink-0 text-black/40 dark:text-[#F7F8F4]/40" />
                   <input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Sport, venue or facility..."
-                    className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                    className="min-w-0 flex-1 bg-transparent text-sm text-[#101310] dark:text-[#F7F8F4] placeholder:text-black/40 dark:placeholder:text-[#F7F8F4]/40 outline-none"
                   />
                 </label>
-                <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3">
-                  <MapPin size={18} className="shrink-0 text-black/40" />
-                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full bg-transparent text-sm outline-none">
+                <label className="flex items-center gap-3 rounded-xl border border-transparent dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-4 py-3">
+                  <MapPin size={18} className="shrink-0 text-black/40 dark:text-[#F7F8F4]/40" />
+                  <select value={area} onChange={(e) => setArea(e.target.value)} className="w-full bg-transparent text-sm text-[#101310] dark:text-[#F7F8F4] outline-none">
                     <option>Anywhere in Bangkok</option>
                     <option>Phaya Thai</option>
                     <option>Sukhumvit</option>
@@ -401,8 +401,8 @@ export default function Home() {
                     <option>Salaya</option>
                   </select>
                 </label>
-                <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3">
-                  <select value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-full bg-transparent text-sm outline-none">
+                <label className="flex items-center gap-3 rounded-xl border border-transparent dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-4 py-3">
+                  <select value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} className="w-full bg-transparent text-sm text-[#101310] dark:text-[#F7F8F4] outline-none">
                     <option>Any price</option>
                     <option value="250">Up to ฿250 / hr</option>
                     <option value="500">Up to ฿500 / hr</option>
@@ -411,14 +411,14 @@ export default function Home() {
                 </label>
                 <button
                   onClick={() => setShowFilters(!showFilters)}
-                  className="flex items-center justify-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-3 text-sm font-extrabold transition hover:bg-[#c9f02e]"
+                  className="flex items-center justify-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-3 text-sm font-extrabold text-[#101310] transition hover:bg-[#c9f02e]"
                 >
                   <SlidersHorizontal size={17} /> Filters <ChevronDown size={15} />
                 </button>
                 {hasActiveFilters && (
                   <button
                     onClick={handleResetFilters}
-                    className="flex items-center justify-center rounded-xl border border-black/15 bg-white px-4 py-3 text-sm font-bold text-black/70 transition hover:bg-black/5 hover:text-black"
+                    className="flex items-center justify-center rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-4 py-3 text-sm font-bold text-black/70 dark:text-[#F7F8F4]/80 transition hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-[#F7F8F4]"
                   >
                     Reset
                   </button>
@@ -426,13 +426,15 @@ export default function Home() {
               </div>
 
               {showFilters && (
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/10 bg-[#f7f8f4] p-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#16171A] p-3">
                   {SPORTS_LIST.map((s) => (
                     <button
                       key={s.name}
                       onClick={() => setActiveSport(s.name)}
-                      className={`rounded-full px-4 py-2 text-xs font-bold ${
-                        activeSport === s.name ? 'bg-[#101310] text-white' : 'bg-white'
+                      className={`rounded-full px-4 py-2 text-xs font-bold transition ${
+                        activeSport === s.name
+                          ? 'bg-[#101310] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
+                          : 'bg-white dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border border-transparent dark:border-white/10'
                       }`}
                     >
                       {s.icon} {s.name}
@@ -442,7 +444,7 @@ export default function Home() {
               )}
 
               {loading ? (
-                <div className="mt-12 text-center text-sm font-bold text-black/50">Loading courts from database...</div>
+                <div className="mt-12 text-center text-sm font-bold text-black/50 dark:text-[#F7F8F4]/60">Loading courts from database...</div>
               ) : filtered.length ? (
                 <div className="mt-6 grid gap-x-5 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
                   {filtered.map((v) => (
@@ -450,12 +452,12 @@ export default function Home() {
                   ))}
                 </div>
               ) : (
-                <div className="mt-8 rounded-2xl border border-dashed border-black/20 p-12 text-center">
+                <div className="mt-8 rounded-2xl border border-dashed border-black/20 dark:border-white/15 bg-transparent dark:bg-[#16171A] p-12 text-center">
                   <p className="text-3xl">🔎</p>
-                  <h3 className="mt-3 text-xl font-black">No courts found</h3>
+                  <h3 className="mt-3 text-xl font-black text-[#101310] dark:text-[#F7F8F4]">No courts found</h3>
                   <button
                     onClick={handleResetFilters}
-                    className="mt-4 rounded-full bg-[#101310] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black/80"
+                    className="mt-4 rounded-full bg-[#101310] dark:bg-[#d8ff3e] px-5 py-2.5 text-xs font-bold text-white dark:text-[#101310] transition hover:bg-black/80 dark:hover:bg-[#c9f02e]"
                   >
                     Reset filters
                   </button>
@@ -466,15 +468,15 @@ export default function Home() {
         </>
       )}
 
-      <footer className="border-t border-black/10 bg-[#f7f8f4]">
+      <footer className="border-t border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#16171A] transition-colors">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-5 py-8 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <button className="flex items-center gap-2 self-start" onClick={() => handleNavigate()}>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-[#101310] text-[#d8ff3e]">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310]">
               <Zap size={17} fill="currentColor" />
             </span>
-            <span className="text-xl font-black tracking-[-.08em]">motion.</span>
+            <span className="text-xl font-black tracking-[-.08em] text-[#101310] dark:text-[#F7F8F4]">motion.</span>
           </button>
-          <p className="text-xs text-black/45">© 2026 Motion. Built for the love of the game.</p>
+          <p className="text-xs text-black/45 dark:text-[#F7F8F4]/50">© 2026 Motion. Built for the love of the game.</p>
         </div>
       </footer>
 
@@ -503,28 +505,28 @@ export default function Home() {
           onClick={() => setConfirmed(null)}
         >
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-7 sm:p-9"
+            className="w-full max-w-md rounded-3xl border border-transparent dark:border-white/10 bg-white dark:bg-[#16171A] p-7 sm:p-9"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e]">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#d8ff3e] text-[#101310]">
               <Check size={30} strokeWidth={3} />
             </div>
 
-            <h2 className="mt-4 text-3xl font-black tracking-tight">You're in. Game on!</h2>
+            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">You're in. Game on!</h2>
 
-            <div className="mt-4 rounded-2xl bg-[#f7f8f4] p-4 text-sm space-y-2">
+            <div className="mt-4 rounded-2xl border border-transparent dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-4 text-sm space-y-2">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-extrabold text-black">{confirmed.venue}</p>
-                  <p className="text-xs text-black/50 mt-0.5">{confirmed.date} · {confirmed.time}</p>
+                  <p className="font-extrabold text-[#101310] dark:text-[#F7F8F4]">{confirmed.venue}</p>
+                  <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60 mt-0.5">{confirmed.date} · {confirmed.time}</p>
                 </div>
-                <p className="font-black text-black">{money(confirmed.price)}</p>
+                <p className="font-black text-[#101310] dark:text-[#F7F8F4]">{money(confirmed.price)}</p>
               </div>
 
               {(user || (confirmed.pointsEarned && confirmed.pointsEarned > 0)) && (
-                <div className="flex items-center justify-between border-t border-black/10 pt-2 text-xs font-bold text-[#5d7112]">
+                <div className="flex items-center justify-between border-t border-black/10 dark:border-white/10 pt-2 text-xs font-bold text-[#5d7112] dark:text-[#d8ff3e]">
                   <span>⚡ Points Earned:</span>
-                  <span className="rounded-full bg-[#d8ff3e] px-2.5 py-0.5 font-black text-black">
+                  <span className="rounded-full bg-[#d8ff3e] px-2.5 py-0.5 font-black text-[#101310]">
                     +{confirmed.pointsEarned || Math.floor(confirmed.price / 10)} PTS
                   </span>
                 </div>
@@ -537,14 +539,14 @@ export default function Home() {
                   setConfirmed(null);
                   handleBookingsOpen();
                 }}
-                className="w-full rounded-full bg-[#101310] py-3 text-sm font-bold text-white transition hover:bg-[#30372a]"
+                className="w-full rounded-full bg-[#101310] dark:bg-[#d8ff3e] py-3 text-sm font-bold text-white dark:text-[#101310] transition hover:bg-[#30372a] dark:hover:bg-[#c9f02e]"
               >
                 View my bookings
               </button>
 
               <button
                 onClick={() => setConfirmed(null)}
-                className="w-full rounded-full border border-black/10 bg-transparent py-2.5 text-xs font-bold text-black/60 transition hover:bg-black/5 hover:text-black"
+                className="w-full rounded-full border border-black/10 dark:border-white/10 bg-transparent py-2.5 text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 transition hover:bg-black/5 dark:hover:bg-white/10 hover:text-black dark:hover:text-[#F7F8F4]"
               >
                 Done
               </button>

@@ -809,8 +809,8 @@ export default function Dashboard({
 
   return (
     <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-6 lg:px-8 lg:py-8">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-black/10 pb-4">
-        <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d]">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-black/10 dark:border-white/10 pb-4">
+        <p className="text-xs font-black uppercase tracking-[.2em] text-[#81971d] dark:text-[#d8ff3e]">
           {activeRole === 'venue'
             ? `${selectedVenue?.name || 'Venue'} Control Centre`
             : 'Coach Control Centre'}
@@ -828,7 +828,7 @@ export default function Dashboard({
                 setSelectedBookedCells([]);
                 resetSwapMode();
               }}
-              className="rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-bold outline-none"
+              className="rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
             >
               {ownedVenues.map((v) => (
                 <option key={v.id} value={v.id}>
@@ -839,13 +839,13 @@ export default function Dashboard({
           )}
 
           {hasBothRoles ? (
-            <div className="flex items-center rounded-2xl border border-black/10 bg-[#f7f8f4] p-1">
+            <div className="flex items-center rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#16171A] p-1">
               <button
                 onClick={() => setActiveRole('venue')}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
                   activeRole === 'venue'
-                    ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                    : 'text-black/60 hover:text-black'
+                    ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+                    : 'text-black/60 dark:text-[#F7F8F4]/70 hover:text-black dark:hover:text-[#F7F8F4]'
                 }`}
               >
                 <Building2 size={15} /> Venue Owner
@@ -854,15 +854,15 @@ export default function Dashboard({
                 onClick={() => setActiveRole('coach')}
                 className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-black transition ${
                   activeRole === 'coach'
-                    ? 'bg-[#101310] text-[#d8ff3e] shadow-sm'
-                    : 'text-black/60 hover:text-black'
+                    ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+                    : 'text-black/60 dark:text-[#F7F8F4]/70 hover:text-black dark:hover:text-[#F7F8F4]'
                 }`}
               >
                 <UserCheck size={15} /> Coach Portal
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-2 rounded-2xl bg-[#101310] px-4 py-2 text-xs font-black text-[#d8ff3e] shadow-sm">
+            <div className="flex items-center gap-2 rounded-2xl bg-[#101310] dark:bg-[#d8ff3e] px-4 py-2 text-xs font-black text-[#d8ff3e] dark:text-[#101310] shadow-sm">
               {activeRole === 'coach' ? (
                 <>
                   <UserCheck size={15} /> Coach Portal
@@ -881,23 +881,23 @@ export default function Dashboard({
         (selectedVenue ? (
           <>
             {/* COMPACT COURT & TIMESLOT MATRIX */}
-            <div className="mt-5 rounded-3xl border border-black/10 bg-white p-5 sm:p-6 shadow-sm">
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-black/10 pb-4">
+            <div className="mt-5 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-5 sm:p-6 shadow-sm">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between border-b border-black/10 dark:border-white/10 pb-4">
                 <div>
-                  <h2 className="text-xl font-black tracking-tight">
+                  <h2 className="text-xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
                     Court & Timeslot Matrix
                   </h2>
-                  <p className="mt-0.5 text-xs text-black/50">
+                  <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
                     {isSwapMode
                       ? 'Swapping Mode Active: Drag any red booked slot and drop it onto another court in the same hour to swap or move.'
                       : isBookingMode
                       ? 'Select one or more open white slots below, then confirm to book.'
-                      : 'White = Available · Red = Booked (click red slots to select, move, or cancel).'}
+                      : 'Available vs Booked (click red slots to select, move, or cancel).'}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <label className="flex items-center gap-2 rounded-xl border border-black/15 bg-[#f7f8f4] px-3 py-1.5 text-xs font-bold">
+                  <label className="flex items-center gap-2 rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
                     <Calendar size={15} />
                     <input
                       type="date"
@@ -927,7 +927,7 @@ export default function Dashboard({
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
                       isBookingMode
                         ? 'bg-red-500 text-white hover:bg-red-600'
-                        : 'bg-[#d8ff3e] text-black border border-black/15 hover:bg-[#cbf528]'
+                        : 'bg-[#d8ff3e] text-[#101310] border border-black/15 dark:border-transparent hover:bg-[#cbf528]'
                     }`}
                   >
                     {isBookingMode ? (
@@ -959,8 +959,8 @@ export default function Dashboard({
                     }}
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
                       isSwapMode
-                        ? 'bg-amber-500 text-black border border-black/20 hover:bg-amber-400'
-                        : 'border border-black/15 bg-[#f7f8f4] text-black hover:bg-[#eef7cf]'
+                        ? 'bg-amber-500 text-[#101310] border border-black/20 hover:bg-amber-400'
+                        : 'border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] hover:bg-[#eef7cf] dark:hover:bg-white/10'
                     }`}
                   >
                     {isSwapMode ? (
@@ -993,8 +993,8 @@ export default function Dashboard({
                     disabled={isSaving}
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
                       isEditingConfig
-                        ? 'bg-[#d8ff3e] text-black border border-black/20 hover:bg-[#cbf528]'
-                        : 'bg-[#101310] text-white hover:bg-black/80'
+                        ? 'bg-[#d8ff3e] text-[#101310] border border-black/20 hover:bg-[#cbf528]'
+                        : 'bg-[#101310] dark:bg-[#0B0B0C] dark:border dark:border-white/10 text-white dark:text-[#F7F8F4] hover:bg-black/80 dark:hover:bg-white/10'
                     }`}
                   >
                     {isSaving ? (
@@ -1014,9 +1014,9 @@ export default function Dashboard({
 
               {/* DRAG & DROP SWAPPING MODE BANNER */}
               {isSwapMode && (
-                <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-2 font-bold text-black/80">
-                    <GripVertical size={15} className="shrink-0 text-amber-700" />
+                <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-amber-300 dark:border-amber-500/40 bg-amber-50/90 dark:bg-amber-500/15 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2 font-bold text-black/80 dark:text-amber-200">
+                    <GripVertical size={15} className="shrink-0 text-amber-700 dark:text-amber-400" />
                     <span>
                       {isSwapping
                         ? 'Updating court assignment in Supabase...'
@@ -1031,7 +1031,7 @@ export default function Dashboard({
                   </div>
 
                   {isSwapping && (
-                    <span className="flex items-center gap-1.5 font-black text-amber-800">
+                    <span className="flex items-center gap-1.5 font-black text-amber-800 dark:text-amber-300">
                       <Loader2 size={14} className="animate-spin" /> Swapping...
                     </span>
                   )}
@@ -1040,13 +1040,13 @@ export default function Dashboard({
 
               {/* SELECTED BOOKED SLOTS ACTION BAR (MOVE OR CANCEL) */}
               {!isSwapMode && selectedBookedCells.length > 0 && (
-                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-red-200 dark:border-red-500/30 bg-red-50/80 dark:bg-red-500/10 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-xs">
                     <span className="rounded-lg bg-red-600 px-2.5 py-1 font-black text-white">
                       {selectedBookedCells.length} Booked{' '}
                       {selectedBookedCells.length === 1 ? 'Slot' : 'Slots'} Selected
                     </span>
-                    <span className="line-clamp-2 font-semibold text-black/70">
+                    <span className="line-clamp-2 font-semibold text-black/70 dark:text-[#F7F8F4]/80">
                       {Array.from(
                         new Set(
                           selectedBookedCells.map(
@@ -1062,16 +1062,16 @@ export default function Dashboard({
 
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {/* Move to another court */}
-                    <div className="flex items-center gap-1.5 rounded-xl border border-black/15 bg-white px-2.5 py-1 text-xs font-bold">
-                      <ArrowRightLeft size={13} className="text-black/50" />
-                      <span className="text-black/60">Move to:</span>
+                    <div className="flex items-center gap-1.5 rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-2.5 py-1 text-xs font-bold">
+                      <ArrowRightLeft size={13} className="text-black/50 dark:text-[#F7F8F4]/50" />
+                      <span className="text-black/60 dark:text-[#F7F8F4]/60">Move to:</span>
                       <select
                         value={targetMoveCourt}
                         disabled={
                           isProcessingBookedAction || validMoveCourts.length === 0
                         }
                         onChange={(e) => setTargetMoveCourt(Number(e.target.value))}
-                        className="bg-transparent font-extrabold text-black outline-none"
+                        className="bg-transparent font-extrabold text-[#101310] dark:text-[#F7F8F4] outline-none"
                       >
                         {Array.from({ length: totalCourts }).map((_, idx) => {
                           const cNum = idx + 1;
@@ -1097,7 +1097,7 @@ export default function Dashboard({
                           )
                         }
                         onClick={handleMoveSelectedToCourt}
-                        className="ml-1 rounded-lg bg-[#101310] px-3 py-1 text-[11px] font-black text-[#d8ff3e] transition hover:bg-black/85 disabled:opacity-40"
+                        className="ml-1 rounded-lg bg-[#101310] dark:bg-[#d8ff3e] px-3 py-1 text-[11px] font-black text-[#d8ff3e] dark:text-[#101310] transition hover:bg-black/85 dark:hover:bg-[#c9f02e] disabled:opacity-40"
                       >
                         {isProcessingBookedAction ? 'Moving...' : 'Move'}
                       </button>
@@ -1123,7 +1123,7 @@ export default function Dashboard({
                       type="button"
                       disabled={isProcessingBookedAction}
                       onClick={() => setSelectedBookedCells([])}
-                      className="rounded-xl border border-black/15 bg-white px-2.5 py-1.5 text-xs font-bold text-black/60 hover:text-black"
+                      className="rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-2.5 py-1.5 text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 hover:text-black dark:hover:text-[#F7F8F4]"
                     >
                       Clear
                     </button>
@@ -1133,13 +1133,13 @@ export default function Dashboard({
 
               {/* FRONT-DESK BOOKING CHECKOUT BAR */}
               {isBookingMode && (
-                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-[#81971d]/40 bg-[#f0f7db] p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-[#81971d]/40 dark:border-[#d8ff3e]/30 bg-[#f0f7db] dark:bg-[#d8ff3e]/10 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex flex-wrap items-center gap-3 text-xs">
-                    <span className="rounded-lg bg-[#101310] px-2.5 py-1 font-black text-[#d8ff3e]">
+                    <span className="rounded-lg bg-[#101310] dark:bg-[#d8ff3e] px-2.5 py-1 font-black text-[#d8ff3e] dark:text-[#101310]">
                       {selectedSlots.length}{' '}
                       {selectedSlots.length === 1 ? 'Slot' : 'Slots'} Selected
                     </span>
-                    <span className="font-extrabold text-black">
+                    <span className="font-extrabold text-[#101310] dark:text-[#F7F8F4]">
                       Total: {money(totalSelectedAmount)}
                     </span>
                     <input
@@ -1147,7 +1147,7 @@ export default function Dashboard({
                       value={walkInName}
                       onChange={(e) => setWalkInName(e.target.value)}
                       placeholder="Player name / phone (optional)"
-                      className="rounded-lg border border-black/15 bg-white px-3 py-1.5 text-xs font-medium outline-none w-52"
+                      className="rounded-lg border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-medium text-[#101310] dark:text-[#F7F8F4] outline-none w-52"
                     />
                   </div>
 
@@ -1155,7 +1155,7 @@ export default function Dashboard({
                     type="button"
                     disabled={selectedSlots.length === 0 || isSubmittingBooking}
                     onClick={handleConfirmFrontDeskBooking}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[#101310] px-5 py-2 text-xs font-black text-[#d8ff3e] transition hover:bg-black/85 disabled:opacity-40"
+                    className="flex items-center justify-center gap-1.5 rounded-xl bg-[#101310] dark:bg-[#d8ff3e] px-5 py-2 text-xs font-black text-[#d8ff3e] dark:text-[#101310] transition hover:bg-black/85 dark:hover:bg-[#c9f02e] disabled:opacity-40"
                   >
                     {isSubmittingBooking ? (
                       <>
@@ -1175,12 +1175,12 @@ export default function Dashboard({
                 <div
                   className={`mt-3 flex flex-wrap items-center gap-6 rounded-xl px-3 py-2 text-xs font-bold transition ${
                     isEditingConfig
-                      ? 'bg-[#f0f7db] border border-[#d0e588]'
-                      : 'bg-[#f7f8f4]'
+                      ? 'bg-[#f0f7db] dark:bg-[#d8ff3e]/10 border border-[#d0e588] dark:border-[#d8ff3e]/30'
+                      : 'bg-[#f7f8f4] dark:bg-[#0B0B0C]'
                   }`}
                 >
                   <div className="flex items-center gap-2">
-                    <Sliders size={14} className="text-black/50" />
+                    <Sliders size={14} className="text-black/50 dark:text-[#F7F8F4]/50" />
                     <span>Courts Count:</span>
                     <input
                       type="number"
@@ -1193,14 +1193,14 @@ export default function Dashboard({
                       }
                       className={`w-14 rounded border px-2 py-0.5 text-center font-bold outline-none ${
                         isEditingConfig
-                          ? 'bg-white border-black/30 ring-2 ring-[#81971d]/40'
-                          : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                          ? 'bg-white dark:bg-[#16171A] border-black/30 dark:border-white/20 text-[#101310] dark:text-[#F7F8F4] ring-2 ring-[#81971d]/40 dark:ring-[#d8ff3e]/40'
+                          : 'bg-black/5 dark:bg-white/5 border-transparent text-black/60 dark:text-[#F7F8F4]/60 cursor-not-allowed'
                       }`}
                     />
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Clock size={14} className="text-black/50" />
+                    <Clock size={14} className="text-black/50 dark:text-[#F7F8F4]/50" />
                     <span>Operating Hours:</span>
                     <select
                       disabled={!isEditingConfig}
@@ -1208,8 +1208,8 @@ export default function Dashboard({
                       onChange={(e) => handleOpenTimeChange(e.target.value)}
                       className={`rounded-lg border px-2 py-0.5 outline-none ${
                         isEditingConfig
-                          ? 'bg-white border-black/30'
-                          : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                          ? 'bg-white dark:bg-[#16171A] border-black/30 dark:border-white/20 text-[#101310] dark:text-[#F7F8F4]'
+                          : 'bg-black/5 dark:bg-white/5 border-transparent text-black/60 dark:text-[#F7F8F4]/60 cursor-not-allowed'
                       }`}
                     >
                       {DEFAULT_HOURS.map((h) => (
@@ -1225,8 +1225,8 @@ export default function Dashboard({
                       onChange={(e) => setCloseTime(e.target.value)}
                       className={`rounded-lg border px-2 py-0.5 outline-none ${
                         isEditingConfig
-                          ? 'bg-white border-black/30'
-                          : 'bg-black/5 border-transparent text-black/60 cursor-not-allowed'
+                          ? 'bg-white dark:bg-[#16171A] border-black/30 dark:border-white/20 text-[#101310] dark:text-[#F7F8F4]'
+                          : 'bg-black/5 dark:bg-white/5 border-transparent text-black/60 dark:text-[#F7F8F4]/60 cursor-not-allowed'
                       }`}
                     >
                       {DEFAULT_HOURS.map((h) => {
@@ -1244,7 +1244,7 @@ export default function Dashboard({
               )}
 
               {/* MATRIX TABLE */}
-              <div className="mt-4 overflow-x-auto rounded-xl border border-black/15">
+              <div className="mt-4 overflow-x-auto rounded-xl border border-black/15 dark:border-white/10">
                 <table className="w-full text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-[#101310] text-white text-[11px] font-black uppercase">
@@ -1261,10 +1261,10 @@ export default function Dashboard({
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10 text-xs">
+                  <tbody className="divide-y divide-black/10 dark:divide-white/10 text-xs">
                     {activeHours.map((time) => (
                       <tr key={time}>
-                        <td className="px-3 py-1 font-extrabold bg-[#f7f8f4] border-r border-black/10">
+                        <td className="px-3 py-1 font-extrabold bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border-r border-black/10 dark:border-white/10">
                           {time}
                         </td>
                         {Array.from({ length: totalCourts }).map((_, i) => {
@@ -1311,7 +1311,7 @@ export default function Dashboard({
                                 e.preventDefault();
                                 handleDropOnCell(courtNum, time);
                               }}
-                              className="p-0 border-r border-black/10 last:border-r-0"
+                              className="p-0 border-r border-black/10 dark:border-white/10 last:border-r-0"
                             >
                               <button
                                 type="button"
@@ -1351,23 +1351,23 @@ export default function Dashboard({
                                 className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors ${
                                   isBooked
                                     ? isBeingDragged
-                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 ring-2 ring-inset ring-black cursor-grabbing'
+                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 ring-2 ring-inset ring-black dark:ring-white cursor-grabbing'
                                       : isDragOverTarget
-                                      ? 'bg-amber-400 text-black ring-2 ring-inset ring-black'
+                                      ? 'bg-amber-400 text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
                                       : isSwapMode
                                       ? 'bg-red-500 text-white hover:bg-red-600 cursor-grab active:cursor-grabbing'
                                       : isBookedSelected
-                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black cursor-pointer'
+                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black dark:ring-white cursor-pointer'
                                       : 'bg-red-500 text-white hover:bg-red-600 cursor-pointer'
                                     : isDragOverTarget
-                                    ? 'bg-[#d8ff3e] text-black ring-2 ring-inset ring-black'
+                                    ? 'bg-[#d8ff3e] text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
                                     : isValidDropTarget
-                                    ? 'bg-amber-50/70'
+                                    ? 'bg-amber-50/70 dark:bg-amber-500/20'
                                     : isOpenSelected
-                                    ? 'bg-[#d8ff3e] text-black ring-1 ring-inset ring-black/40 cursor-pointer'
+                                    ? 'bg-[#d8ff3e] text-[#101310] ring-1 ring-inset ring-black/40 cursor-pointer'
                                     : isBookingMode
-                                    ? 'bg-white hover:bg-[#eef7cf] cursor-pointer'
-                                    : 'bg-white cursor-default'
+                                    ? 'bg-white dark:bg-[#16171A] hover:bg-[#eef7cf] dark:hover:bg-[#d8ff3e]/20 cursor-pointer'
+                                    : 'bg-white dark:bg-[#16171A] cursor-default'
                                 }`}
                               >
                                 {isSwapMode && isBooked ? (
@@ -1393,28 +1393,28 @@ export default function Dashboard({
               <button
                 type="button"
                 onClick={() => setShowVenueStats((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-2xl border border-black/10 bg-white px-6 py-4 text-left shadow-sm transition hover:border-black/25"
+                className="flex w-full items-center justify-between rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-6 py-4 text-left shadow-sm transition hover:border-black/25 dark:hover:border-white/25"
               >
                 <div className="flex items-center gap-3">
-                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#eef7cf] text-[#586c12]">
+                  <div className="grid h-9 w-9 place-items-center rounded-xl bg-[#eef7cf] dark:bg-[#d8ff3e]/15 text-[#586c12] dark:text-[#d8ff3e]">
                     <BarChart3 size={18} />
                   </div>
                   <div>
-                    <p className="text-sm font-black text-black">
+                    <p className="text-sm font-black text-[#101310] dark:text-[#F7F8F4]">
                       {showVenueStats
                         ? 'Hide Venue Statistics'
                         : 'View More Venue Statistics'}
                     </p>
-                    <p className="text-xs text-black/50">
+                    <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60">
                       Revenue, bookings breakdown, cancellations & court
                       utilization
                     </p>
                   </div>
                 </div>
                 {showVenueStats ? (
-                  <ChevronUp size={18} className="text-black/60" />
+                  <ChevronUp size={18} className="text-black/60 dark:text-[#F7F8F4]/60" />
                 ) : (
-                  <ChevronDown size={18} className="text-black/60" />
+                  <ChevronDown size={18} className="text-black/60 dark:text-[#F7F8F4]/60" />
                 )}
               </button>
 
@@ -1424,53 +1424,53 @@ export default function Dashboard({
                     isSuperAdmin ? 'lg:grid-cols-5' : 'lg:grid-cols-4'
                   }`}
                 >
-                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                  <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                       <span>TOTAL REVENUE</span>
-                      <DollarSign size={18} className="text-[#81971d]" />
+                      <DollarSign size={18} className="text-[#81971d] dark:text-[#d8ff3e]" />
                     </div>
-                    <p className="mt-2 text-3xl font-black">
+                    <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">
                       {money(stats.revenue)}
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                  <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                       <span>ACTIVE BOOKINGS</span>
-                      <CheckCircle2 size={18} className="text-green-600" />
+                      <CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />
                     </div>
-                    <p className="mt-2 text-3xl font-black">
+                    <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">
                       {stats.activeCount}
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                  <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                       <span>CANCELLATIONS</span>
-                      <XCircle size={18} className="text-red-500" />
+                      <XCircle size={18} className="text-red-500 dark:text-red-400" />
                     </div>
-                    <p className="mt-2 text-3xl font-black">
+                    <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">
                       {stats.cancelCount}
                     </p>
                   </div>
 
-                  <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                  <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+                    <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                       <span>UTILIZATION ({selectedDate})</span>
-                      <TrendingUp size={18} className="text-[#81971d]" />
+                      <TrendingUp size={18} className="text-[#81971d] dark:text-[#d8ff3e]" />
                     </div>
-                    <p className="mt-2 text-3xl font-black">
+                    <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">
                       {stats.occupancyRate}%
                     </p>
                   </div>
 
                   {isSuperAdmin && (
-                    <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-                      <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+                    <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+                      <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                         <span>VENUES LISTED</span>
-                        <Building2 size={18} className="text-black/50" />
+                        <Building2 size={18} className="text-black/50 dark:text-[#F7F8F4]/50" />
                       </div>
-                      <p className="mt-2 text-3xl font-black">
+                      <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">
                         {stats.listings}
                       </p>
                     </div>
@@ -1480,16 +1480,16 @@ export default function Dashboard({
             </div>
 
             {/* VENUE MASTER RESERVATION LIST */}
-            <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-              <h2 className="text-2xl font-black tracking-tight">
+            <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
+              <h2 className="text-2xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
                 Master Reservation List
               </h2>
-              <p className="mt-1 text-xs text-black/50">
+              <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
                 Showing active player bookings for{' '}
                 {selectedVenue?.name || 'your venue'}.
               </p>
 
-              <div className="mt-6 divide-y divide-black/10 rounded-2xl border border-black/10">
+              <div className="mt-6 divide-y divide-black/10 dark:divide-white/10 rounded-2xl border border-black/10 dark:border-white/10">
                 {venueBookings.length > 0 ? (
                   venueBookings.map((b) => (
                     <div
@@ -1497,18 +1497,18 @@ export default function Dashboard({
                       className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center justify-between"
                     >
                       <div>
-                        <span className="text-[10px] font-black uppercase text-[#81971d]">
+                        <span className="text-[10px] font-black uppercase text-[#81971d] dark:text-[#d8ff3e]">
                           {b.sport} · Ref: <span className="font-mono">{b.id}</span>
                         </span>
-                        <p className="font-extrabold text-base text-black mt-0.5">
+                        <p className="font-extrabold text-base text-[#101310] dark:text-[#F7F8F4] mt-0.5">
                           {b.venue}{' '}
                           {(b.customerName || b.customerEmail) && (
-                            <span className="text-xs font-semibold text-black/50">
+                            <span className="text-xs font-semibold text-black/50 dark:text-[#F7F8F4]/60">
                               ({b.customerName || b.customerEmail})
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-black/50">
+                        <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60">
                           {b.date} · {b.time}
                         </p>
                       </div>
@@ -1517,17 +1517,17 @@ export default function Dashboard({
                         <span
                           className={`rounded-full px-3 py-1 text-[10px] font-black ${
                             b.status === 'Cancelled'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-[#edf5d2] text-[#5d7112]'
+                              ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                              : 'bg-[#edf5d2] dark:bg-[#d8ff3e]/20 text-[#5d7112] dark:text-[#d8ff3e]'
                           }`}
                         >
                           {b.status}
                         </span>
-                        <b className="text-sm">{money(b.price)}</b>
+                        <b className="text-sm text-[#101310] dark:text-[#F7F8F4]">{money(b.price)}</b>
                         {b.status === 'Confirmed' && (
                           <button
                             onClick={() => handleCancelReservation(b)}
-                            className="text-xs font-bold text-red-600 underline hover:text-red-800 transition"
+                            className="text-xs font-bold text-red-600 dark:text-red-400 underline hover:text-red-800 dark:hover:text-red-300 transition"
                           >
                             Cancel
                           </button>
@@ -1536,7 +1536,7 @@ export default function Dashboard({
                     </div>
                   ))
                 ) : (
-                  <div className="p-8 text-center text-xs font-bold text-black/45">
+                  <div className="p-8 text-center text-xs font-bold text-black/45 dark:text-[#F7F8F4]/50">
                     No active reservations found for this view.
                   </div>
                 )}
@@ -1544,9 +1544,9 @@ export default function Dashboard({
             </div>
           </>
         ) : (
-          <div className="mt-8 rounded-3xl border border-dashed border-black/20 bg-white p-12 text-center">
-            <h2 className="text-xl font-black">No active venue found</h2>
-            <p className="mt-2 text-xs text-black/55">
+          <div className="mt-8 rounded-3xl border border-dashed border-black/20 dark:border-white/15 bg-white dark:bg-[#16171A] p-12 text-center">
+            <h2 className="text-xl font-black text-[#101310] dark:text-[#F7F8F4]">No active venue found</h2>
+            <p className="mt-2 text-xs text-black/55 dark:text-[#F7F8F4]/60">
               This account is no longer linked to an active venue listing.
             </p>
           </div>
@@ -1555,39 +1555,39 @@ export default function Dashboard({
       {activeRole === 'coach' && (
         <>
           <div className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-3">
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+            <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                 <span>COACHING REVENUE</span>
-                <DollarSign size={18} className="text-[#81971d]" />
+                <DollarSign size={18} className="text-[#81971d] dark:text-[#d8ff3e]" />
               </div>
-              <p className="mt-2 text-3xl font-black">{money(0)}</p>
+              <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">{money(0)}</p>
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+            <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                 <span>CLIENT SESSIONS</span>
-                <CheckCircle2 size={18} className="text-green-600" />
+                <CheckCircle2 size={18} className="text-green-600 dark:text-green-400" />
               </div>
-              <p className="mt-2 text-3xl font-black">0</p>
+              <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">0</p>
             </div>
 
-            <div className="rounded-3xl border border-black/10 bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45">
+            <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 shadow-sm">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider text-black/45 dark:text-[#F7F8F4]/50">
                 <span>CANCELLATIONS</span>
-                <XCircle size={18} className="text-red-500" />
+                <XCircle size={18} className="text-red-500 dark:text-red-400" />
               </div>
-              <p className="mt-2 text-3xl font-black">0</p>
+              <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">0</p>
             </div>
           </div>
 
-          <div className="mt-8 rounded-3xl border border-black/10 bg-white p-6 sm:p-8 shadow-sm">
-            <h2 className="text-2xl font-black tracking-tight">
+          <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
+            <h2 className="text-2xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
               Coaching Sessions
             </h2>
-            <p className="mt-1 text-xs text-black/50">
+            <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
               Your upcoming and past player coaching sessions.
             </p>
-            <div className="mt-6 rounded-2xl border border-black/10 p-8 text-center text-xs font-bold text-black/45">
+            <div className="mt-6 rounded-2xl border border-black/10 dark:border-white/10 p-8 text-center text-xs font-bold text-black/45 dark:text-[#F7F8F4]/50">
               No coaching sessions booked yet.
             </div>
           </div>
