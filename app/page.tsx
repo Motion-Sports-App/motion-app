@@ -182,22 +182,23 @@ export default function Home() {
     loadVenues();
   }, []);
 
-   Const handleCancelBooking = async (id: string) => {
+  const handleCancelBooking = async (id: string) => {
     setBookings((old) => old.map((b) => (b.id === id ? { ...b, status: 'Cancelled' } : b)));
     await bookingService.cancel(id);
   };
-  const handleReseconsttFilters = () => {
-      const hasActiveFilters =
+
+  const handleResetFilters = () => {
+    setActiveSport('All sports');
+    setQuery('');
+    setArea('Anywhere in Bangkok');
+    setMaxPrice('Any price');
+  };
+
+  const hasActiveFilters =
     activeSport !== 'All sports' ||
     query.trim() !== '' ||
     area !== 'Anywhere in Bangkok' ||
     maxPrice !== 'Any price';
-
-    setActiveSport('All sports');
-    setQuery('')
-    setArea('Anywhere in Bangkok');
-    setMaxPrice('Any price');
-  };
 
   const filtered = useMemo(() => {
     return venues.filter((v) => {
@@ -377,7 +378,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f4] p-3 md:grid-cols-[1.2fr_1fr_1fr_auto] md:p-4">
+              <div className="mt-8 grid gap-3 rounded-2xl border border-black/10 bg-[#f7f8f4] p-3 md:grid-cols-[1.2fr_1fr_1fr_auto_auto] md:p-4">
                 <label className="flex items-center gap-3 rounded-xl bg-white px-4 py-3">
                   <Search size={18} className="shrink-0 text-black/40" />
                   <input
@@ -411,17 +412,17 @@ export default function Home() {
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className="flex items-center justify-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-3 text-sm font-extrabold transition hover:bg-[#c9f02e]"
-                >                {hasActiveFilters && (
-                  <button 
+                >
+                  <SlidersHorizontal size={17} /> Filters <ChevronDown size={15} />
+                </button>
+                {hasActiveFilters && (
+                  <button
                     onClick={handleResetFilters}
                     className="flex items-center justify-center rounded-xl border border-black/15 bg-white px-4 py-3 text-sm font-bold text-black/70 transition hover:bg-black/5 hover:text-black"
                   >
                     Reset
                   </button>
                 )}
-
-                  <SlidersHorizontal size={17} /> Filters <ChevronDown size={15} />
-                </button>
               </div>
 
               {showFilters && (
@@ -439,7 +440,7 @@ export default function Home() {
                   ))}
                 </div>
               )}
-s
+
               {loading ? (
                 <div className="mt-12 text-center text-sm font-bold text-black/50">Loading courts from database...</div>
               ) : filtered.length ? (
@@ -452,6 +453,12 @@ s
                 <div className="mt-8 rounded-2xl border border-dashed border-black/20 p-12 text-center">
                   <p className="text-3xl">🔎</p>
                   <h3 className="mt-3 text-xl font-black">No courts found</h3>
+                  <button
+                    onClick={handleResetFilters}
+                    className="mt-4 rounded-full bg-[#101310] px-5 py-2.5 text-xs font-bold text-white transition hover:bg-black/80"
+                  >
+                    Reset filters
+                  </button>
                 </div>
               )}
             </div>
