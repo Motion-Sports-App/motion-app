@@ -339,13 +339,13 @@ export default function Home() {
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
                 <Sparkles size={14} className="text-[#829e12] dark:text-[#d8ff3e]" /> ONE HOME FOR EVERY GAME
               </div>
-              <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em] text-[#101310] dark:text-[#F7F8F4]">
+              <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em]">
                 Find your<br />
                 <span className="relative inline-block">
-                  court<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] dark:bg-[#d8ff3e]/35 sm:h-3" />
+                  court<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
                 </span>
                 <span className="relative z-10">. Find your</span><br />
-                <span className="text-[#849c24] dark:text-[#d8ff3e]">people.</span>
+                <span className="text-[#849c24]">people.</span>
               </h1>
               <p className="mt-7 max-w-lg text-base leading-7 text-black/60 dark:text-[#F7F8F4]/70 sm:text-lg">
                 From quick rallies to full-court battles. Discover and book the space where your next favourite game happens.
