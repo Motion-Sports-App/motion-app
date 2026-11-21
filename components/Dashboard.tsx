@@ -20,6 +20,7 @@ import {
   PlusCircle,
   X,
   ArrowRightLeft,
+  GripVertical,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
@@ -94,11 +95,10 @@ export default function Dashboard({
   // Front-Desk "Book Court" Mode States (for selecting open white slots)
   const [isBookingMode, setIsBookingMode] = useState(false);
 
-  // Swap Courts Mode States (Select Set A -> Select Set B -> Confirm Swap)
+  // Drag & Drop Swap Courts Mode States
   const [isSwapMode, setIsSwapMode] = useState(false);
-  const [swapStep, setSwapStep] = useState<'A' | 'B'>('A');
-  const [swapSetA, setSwapSetA] = useState<SelectedBookedCell[]>([]);
-  const [swapSetB, setSwapSetB] = useState<SelectedBookedCell[]>([]);
+  const [draggedCell, setDraggedCell] = useState<SelectedBookedCell | null>(null);
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null);
   const [isSwapping, setIsSwapping] = useState(false);
 
   const [selectedSlots, setSelectedSlots] = useState<
@@ -123,10 +123,10 @@ export default function Dashboard({
     return Boolean(
       user?.email &&
         [
-          'darylhsu45@gmail.com',
           'mingtan0403@gmail.com',
           'motionsportsapp@gmail.com',
           'kvorakijkamjorn@gmail.com',
+          'darylhsu45@gmail.com',
         ].includes(user.email.toLowerCase())
     );
   }, [user]);
@@ -379,44 +379,209 @@ export default function Dashboard({
 
   const resetSwapMode = () => {
     setIsSwapMode(false);
-    setSwapStep('A');
-    setSwapSetA([]);
-    setSwapSetB([]);
+    setDraggedCell(null);
+    setDragOverKey(null);
+  };
+
+  // Persist court updates (including splitting partial multi-court bookings) in Supabase
+  const applyCourtMoves = async (
+    moves: {
+      booking: DashboardBooking;
+      fromCourt: number;
+      toCourt: number;
+      time: string;
+    }[]
+  ) => {
+    if (!selectedVenue || moves.length === 0) return;
+
+    const movesByBooking = new Map<
+      string,
+      { booking: DashboardBooking; items: typeof moves }
+    >();
+    moves.forEach((m) => {
+      const bKey = m.booking.dbId || m.booking.id;
+      const entry = movesByBooking.get(bKey) || {
+        booking: m.booking,
+        items: [],
+      };
+      entry.items.push(m);
+      movesByBooking.set(bKey, entry);
+    });
+
+    for (const [, { booking, items }] of movesByBooking.entries()) {
+      const rawTime = String(booking.time || '');
+      const slotRange =
+        rawTime.match(/\d{2}:\d{2}\s*[-–]\s*\d{2}:\d{2}/)?.[0] ||
+        toFullSlotLabel(items[0].time);
+
+      const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
+      const existingCourts = courtListMatch
+        ? courtListMatch[1]
+            .split(',')
+            .map((n) => parseInt(n.trim(), 10))
+            .filter((n) => !isNaN(n))
+        : Array.from(
+            { length: Math.max(1, Number(booking.courtCount || 1)) },
+            (_, idx) => idx + 1
+          );
+
+      const movedFromSet = new Set(items.map((it) => it.fromCourt));
+      const newTargetCourts = items
+        .map((it) => it.toCourt)
+        .sort((a, b) => a - b);
+      const untouchedCourts = existingCourts
+        .filter((c) => !movedFromSet.has(c))
+        .sort((a, b) => a - b);
+
+      const updateFilter =
+        booking.dbId &&
+        (UUID_REGEX.test(booking.dbId) || /^\d+$/.test(booking.dbId))
+          ? { col: 'id', val: booking.dbId }
+          : { col: 'booking_code', val: booking.id };
+
+      if (untouchedCourts.length === 0) {
+        const updatedLabel =
+          newTargetCourts.length === 1
+            ? `${slotRange} · Court ${newTargetCourts[0]}`
+            : `${slotRange} · Courts ${newTargetCourts.join(', ')}`;
+
+        const { data: updatedRows, error } = await supabase
+          .from('bookings')
+          .update({
+            time_slot: updatedLabel,
+            booking_time: updatedLabel,
+          })
+          .eq(updateFilter.col, updateFilter.val)
+          .select('id');
+
+        if (error) throw error;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error(
+            'Database permission (RLS) blocked updating one of the bookings.'
+          );
+        }
+      } else {
+        const remainingLabel =
+          untouchedCourts.length === 1
+            ? `${slotRange} · Court ${untouchedCourts[0]}`
+            : `${slotRange} · Courts ${untouchedCourts.join(', ')}`;
+
+        const swappedLabel =
+          newTargetCourts.length === 1
+            ? `${slotRange} · Court ${newTargetCourts[0]}`
+            : `${slotRange} · Courts ${newTargetCourts.join(', ')}`;
+
+        const unitPrice =
+          existingCourts.length > 0
+            ? Number(booking.price || 0) / existingCourts.length
+            : Number(booking.price || 0);
+        const remainingPrice =
+          Math.round(unitPrice * untouchedCourts.length * 100) / 100;
+        const swappedPrice =
+          Math.round(unitPrice * newTargetCourts.length * 100) / 100;
+
+        const { data: updatedRows, error: updateErr } = await supabase
+          .from('bookings')
+          .update({
+            time_slot: remainingLabel,
+            booking_time: remainingLabel,
+            court_count: untouchedCourts.length,
+            price: remainingPrice,
+            total_amount: remainingPrice,
+          })
+          .eq(updateFilter.col, updateFilter.val)
+          .select('id');
+
+        if (updateErr) throw updateErr;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error(
+            'Database permission (RLS) blocked updating one of the bookings.'
+          );
+        }
+
+        const newCode = `MTN-${Math.random()
+          .toString(36)
+          .substring(2, 8)
+          .toUpperCase()}`;
+        const { error: insertErr } = await supabase.from('bookings').insert({
+          booking_code: newCode,
+          venue_id: selectedVenue.id,
+          venue_name: selectedVenue.name,
+          sport: booking.sport || selectedVenue.sport || 'Badminton',
+          booking_date: booking.date,
+          booking_time: swappedLabel,
+          time_slot: swappedLabel,
+          court_count: newTargetCourts.length,
+          price: swappedPrice,
+          total_amount: swappedPrice,
+          status: 'Confirmed',
+          customer_name: booking.customerName || 'Player',
+          customer_email: booking.customerEmail || '',
+          user_id: booking.userId || null,
+        });
+
+        if (insertErr) throw insertErr;
+      }
+    }
+  };
+
+  // Handle Drag & Drop between two cells on the same timeslot
+  const handleDropOnCell = async (targetCourt: number, targetTime: string) => {
+    setDragOverKey(null);
+    if (!isSwapMode || !draggedCell || !selectedVenue) return;
+
+    const source = draggedCell;
+    setDraggedCell(null);
+
+    if (source.court === targetCourt && source.time === targetTime) return;
+    if (source.time !== targetTime) {
+      alert('Drag and drop across courts within the same timeslot row (e.g. 13:00).');
+      return;
+    }
+
+    const targetBooking = bookedCellMap[`C${targetCourt}_${targetTime}`];
+    const moves: {
+      booking: DashboardBooking;
+      fromCourt: number;
+      toCourt: number;
+      time: string;
+    }[] = [
+      {
+        booking: source.booking,
+        fromCourt: source.court,
+        toCourt: targetCourt,
+        time: targetTime,
+      },
+    ];
+
+    if (targetBooking) {
+      moves.push({
+        booking: targetBooking,
+        fromCourt: targetCourt,
+        toCourt: source.court,
+        time: targetTime,
+      });
+    }
+
+    setIsSwapping(true);
+    try {
+      await applyCourtMoves(moves);
+      setSelectedBookedCells([]);
+      await fetchVenueBookings();
+    } catch (err: any) {
+      console.error('Error swapping courts via drag & drop:', err);
+      alert(`Could not swap courts: ${err.message}`);
+    } finally {
+      setIsSwapping(false);
+    }
   };
 
   const handleCellClick = (courtNum: number, time: string) => {
+    // In Swap Mode, interactions are handled by dragging & dropping red cells
+    if (isSwapMode) return;
+
     const cellKey = `C${courtNum}_${time}`;
     const existingBooking = bookedCellMap[cellKey];
-
-    // SWAP MODE: Select Set A booked slots, then Set B booked slots
-    if (isSwapMode) {
-      if (!existingBooking) return;
-
-      if (swapStep === 'A') {
-        setSwapSetA((prev) => {
-          const exists = prev.some((c) => c.key === cellKey);
-          if (exists) return prev.filter((c) => c.key !== cellKey);
-          return [
-            ...prev,
-            { key: cellKey, court: courtNum, time, booking: existingBooking },
-          ];
-        });
-      } else {
-        // Prevent picking a slot already in Set A
-        if (swapSetA.some((c) => c.key === cellKey)) return;
-
-        setSwapSetB((prev) => {
-          const exists = prev.some((c) => c.key === cellKey);
-          if (exists) return prev.filter((c) => c.key !== cellKey);
-          if (prev.length >= swapSetA.length) return prev;
-          return [
-            ...prev,
-            { key: cellKey, court: courtNum, time, booking: existingBooking },
-          ];
-        });
-      }
-      return;
-    }
 
     // Clicking a red/booked slot toggles selection instead of opening an immediate popup
     if (existingBooking) {
@@ -561,113 +726,13 @@ export default function Dashboard({
 
     setIsProcessingBookedAction(true);
     try {
-      const cellsByBooking = new Map<string, SelectedBookedCell[]>();
-      selectedBookedCells.forEach((cell) => {
-        const bKey = cell.booking.dbId || cell.booking.id;
-        const arr = cellsByBooking.get(bKey) || [];
-        arr.push(cell);
-        cellsByBooking.set(bKey, arr);
-      });
-
-      for (const [, cells] of cellsByBooking.entries()) {
-        const booking = cells[0].booking;
-        const rawTime = String(booking.time || '');
-        const slotRange =
-          rawTime.match(/\d{2}:\d{2}\s*[-–]\s*\d{2}:\d{2}/)?.[0] ||
-          toFullSlotLabel(cells[0].time);
-
-        const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
-        const existingCourts = courtListMatch
-          ? courtListMatch[1]
-              .split(',')
-              .map((n) => parseInt(n.trim(), 10))
-              .filter((n) => !isNaN(n))
-          : Array.from(
-              { length: Math.max(1, Number(booking.courtCount || 1)) },
-              (_, idx) => idx + 1
-            );
-
-        const movedFromCourts = new Set(cells.map((c) => c.court));
-        const remainingCourts = existingCourts.filter(
-          (c) => !movedFromCourts.has(c)
-        );
-
-        const updateFilter =
-          booking.dbId && (UUID_REGEX.test(booking.dbId) || /^\d+$/.test(booking.dbId))
-            ? { col: 'id', val: booking.dbId }
-            : { col: 'booking_code', val: booking.id };
-
-        if (remainingCourts.length === 0) {
-          const newLabel = `${slotRange} · Court ${targetMoveCourt}`;
-          const { data: updatedRows, error } = await supabase
-            .from('bookings')
-            .update({
-              time_slot: newLabel,
-              booking_time: newLabel,
-            })
-            .eq(updateFilter.col, updateFilter.val)
-            .select('id');
-
-          if (error) throw error;
-          if (!updatedRows || updatedRows.length === 0) {
-            throw new Error(
-              'Database permission (RLS) blocked updating this player booking.'
-            );
-          }
-        } else {
-          const remainingLabel =
-            remainingCourts.length === 1
-              ? `${slotRange} · Court ${remainingCourts[0]}`
-              : `${slotRange} · Courts ${remainingCourts.join(', ')}`;
-
-          const unitPrice =
-            existingCourts.length > 0
-              ? Number(booking.price || 0) / existingCourts.length
-              : Number(booking.price || 0);
-          const remainingPrice = Math.round(unitPrice * remainingCourts.length * 100) / 100;
-          const movedPrice = Math.round(unitPrice * cells.length * 100) / 100;
-
-          const { data: updatedRows, error: updateErr } = await supabase
-            .from('bookings')
-            .update({
-              time_slot: remainingLabel,
-              booking_time: remainingLabel,
-              court_count: remainingCourts.length,
-              price: remainingPrice,
-              total_amount: remainingPrice,
-            })
-            .eq(updateFilter.col, updateFilter.val)
-            .select('id');
-
-          if (updateErr) throw updateErr;
-          if (!updatedRows || updatedRows.length === 0) {
-            throw new Error(
-              'Database permission (RLS) blocked updating this player booking.'
-            );
-          }
-
-          const newCode = `MTN-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-          const { error: insertErr } = await supabase.from('bookings').insert({
-            booking_code: newCode,
-            venue_id: selectedVenue.id,
-            venue_name: selectedVenue.name,
-            sport: booking.sport || selectedVenue.sport || 'Badminton',
-            booking_date: booking.date,
-            booking_time: `${slotRange} · Court ${targetMoveCourt}`,
-            time_slot: `${slotRange} · Court ${targetMoveCourt}`,
-            court_count: 1,
-            price: movedPrice,
-            total_amount: movedPrice,
-            status: 'Confirmed',
-            customer_name: booking.customerName || 'Player',
-            customer_email: booking.customerEmail || '',
-            user_id: booking.userId || null,
-          });
-
-          if (insertErr) throw insertErr;
-        }
-      }
-
+      const moves = selectedBookedCells.map((cell) => ({
+        booking: cell.booking,
+        fromCourt: cell.court,
+        toCourt: targetMoveCourt,
+        time: cell.time,
+      }));
+      await applyCourtMoves(moves);
       setSelectedBookedCells([]);
       await fetchVenueBookings();
     } catch (err: any) {
@@ -675,200 +740,6 @@ export default function Dashboard({
       alert(`Could not move booking: ${err.message}`);
     } finally {
       setIsProcessingBookedAction(false);
-    }
-  };
-
-  const handleConfirmSwapCourts = async () => {
-    if (
-      !selectedVenue ||
-      swapSetA.length === 0 ||
-      swapSetA.length !== swapSetB.length
-    ) {
-      return;
-    }
-
-    // Pair Set A and Set B slots by time (sorted by court number)
-    const sortedA = [...swapSetA].sort(
-      (a, b) => a.time.localeCompare(b.time) || a.court - b.court
-    );
-    const sortedB = [...swapSetB].sort(
-      (a, b) => a.time.localeCompare(b.time) || a.court - b.court
-    );
-
-    for (let i = 0; i < sortedA.length; i++) {
-      if (sortedA[i].time !== sortedB[i].time) {
-        alert(
-          'Set A and Set B must have matching timeslots (e.g. both at 13:00) to swap courts.'
-        );
-        return;
-      }
-    }
-
-    setIsSwapping(true);
-    try {
-      // Build a list of court replacements: { booking, fromCourt, toCourt, time }
-      const moves: {
-        booking: DashboardBooking;
-        fromCourt: number;
-        toCourt: number;
-        time: string;
-      }[] = [];
-
-      for (let i = 0; i < sortedA.length; i++) {
-        moves.push({
-          booking: sortedA[i].booking,
-          fromCourt: sortedA[i].court,
-          toCourt: sortedB[i].court,
-          time: sortedA[i].time,
-        });
-        moves.push({
-          booking: sortedB[i].booking,
-          fromCourt: sortedB[i].court,
-          toCourt: sortedA[i].court,
-          time: sortedB[i].time,
-        });
-      }
-
-      // Group moves by booking record so multi-court bookings update cleanly in one pass
-      const movesByBooking = new Map<
-        string,
-        { booking: DashboardBooking; items: typeof moves }
-      >();
-      moves.forEach((m) => {
-        const bKey = m.booking.dbId || m.booking.id;
-        const entry = movesByBooking.get(bKey) || {
-          booking: m.booking,
-          items: [],
-        };
-        entry.items.push(m);
-        movesByBooking.set(bKey, entry);
-      });
-
-      for (const [, { booking, items }] of movesByBooking.entries()) {
-        const rawTime = String(booking.time || '');
-        const slotRange =
-          rawTime.match(/\d{2}:\d{2}\s*[-–]\s*\d{2}:\d{2}/)?.[0] ||
-          toFullSlotLabel(items[0].time);
-
-        const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
-        const existingCourts = courtListMatch
-          ? courtListMatch[1]
-              .split(',')
-              .map((n) => parseInt(n.trim(), 10))
-              .filter((n) => !isNaN(n))
-          : Array.from(
-              { length: Math.max(1, Number(booking.courtCount || 1)) },
-              (_, idx) => idx + 1
-            );
-
-        const movedFromSet = new Set(items.map((it) => it.fromCourt));
-        const newTargetCourts = items
-          .map((it) => it.toCourt)
-          .sort((a, b) => a - b);
-        const untouchedCourts = existingCourts
-          .filter((c) => !movedFromSet.has(c))
-          .sort((a, b) => a - b);
-
-        const updateFilter =
-          booking.dbId &&
-          (UUID_REGEX.test(booking.dbId) || /^\d+$/.test(booking.dbId))
-            ? { col: 'id', val: booking.dbId }
-            : { col: 'booking_code', val: booking.id };
-
-        if (untouchedCourts.length === 0) {
-          // Entire booking moved to new court(s)
-          const updatedLabel =
-            newTargetCourts.length === 1
-              ? `${slotRange} · Court ${newTargetCourts[0]}`
-              : `${slotRange} · Courts ${newTargetCourts.join(', ')}`;
-
-          const { data: updatedRows, error } = await supabase
-            .from('bookings')
-            .update({
-              time_slot: updatedLabel,
-              booking_time: updatedLabel,
-            })
-            .eq(updateFilter.col, updateFilter.val)
-            .select('id');
-
-          if (error) throw error;
-          if (!updatedRows || updatedRows.length === 0) {
-            throw new Error(
-              'Database permission (RLS) blocked updating one of the bookings.'
-            );
-          }
-        } else {
-          // Partial swap: keep untouched courts on original row, insert swapped court(s) as a separate row
-          const remainingLabel =
-            untouchedCourts.length === 1
-              ? `${slotRange} · Court ${untouchedCourts[0]}`
-              : `${slotRange} · Courts ${untouchedCourts.join(', ')}`;
-
-          const swappedLabel =
-            newTargetCourts.length === 1
-              ? `${slotRange} · Court ${newTargetCourts[0]}`
-              : `${slotRange} · Courts ${newTargetCourts.join(', ')}`;
-
-          const unitPrice =
-            existingCourts.length > 0
-              ? Number(booking.price || 0) / existingCourts.length
-              : Number(booking.price || 0);
-          const remainingPrice =
-            Math.round(unitPrice * untouchedCourts.length * 100) / 100;
-          const swappedPrice =
-            Math.round(unitPrice * newTargetCourts.length * 100) / 100;
-
-          const { data: updatedRows, error: updateErr } = await supabase
-            .from('bookings')
-            .update({
-              time_slot: remainingLabel,
-              booking_time: remainingLabel,
-              court_count: untouchedCourts.length,
-              price: remainingPrice,
-              total_amount: remainingPrice,
-            })
-            .eq(updateFilter.col, updateFilter.val)
-            .select('id');
-
-          if (updateErr) throw updateErr;
-          if (!updatedRows || updatedRows.length === 0) {
-            throw new Error(
-              'Database permission (RLS) blocked updating one of the bookings.'
-            );
-          }
-
-          const newCode = `MTN-${Math.random()
-            .toString(36)
-            .substring(2, 8)
-            .toUpperCase()}`;
-          const { error: insertErr } = await supabase.from('bookings').insert({
-            booking_code: newCode,
-            venue_id: selectedVenue.id,
-            venue_name: selectedVenue.name,
-            sport: booking.sport || selectedVenue.sport || 'Badminton',
-            booking_date: booking.date,
-            booking_time: swappedLabel,
-            time_slot: swappedLabel,
-            court_count: newTargetCourts.length,
-            price: swappedPrice,
-            total_amount: swappedPrice,
-            status: 'Confirmed',
-            customer_name: booking.customerName || 'Player',
-            customer_email: booking.customerEmail || '',
-            user_id: booking.userId || null,
-          });
-
-          if (insertErr) throw insertErr;
-        }
-      }
-
-      resetSwapMode();
-      await fetchVenueBookings();
-    } catch (err: any) {
-      console.error('Error swapping courts:', err);
-      alert(`Could not swap courts: ${err.message}`);
-    } finally {
-      setIsSwapping(false);
     }
   };
 
@@ -1018,11 +889,7 @@ export default function Dashboard({
                   </h2>
                   <p className="mt-0.5 text-xs text-black/50">
                     {isSwapMode
-                      ? swapStep === 'A'
-                        ? 'Step 1: Click booked red slot(s) for Set A, then click "Next: Select Set B".'
-                        : `Step 2: Click ${swapSetA.length} booked red ${
-                            swapSetA.length === 1 ? 'slot' : 'slots'
-                          } for Set B to swap with Set A.`
+                      ? 'Swapping Mode Active: Drag any red booked slot and drop it onto another court in the same hour to swap or move.'
                       : isBookingMode
                       ? 'Select one or more open white slots below, then confirm to book.'
                       : 'White = Available · Red = Booked (click red slots to select, move, or cancel).'}
@@ -1074,7 +941,7 @@ export default function Dashboard({
                     )}
                   </button>
 
-                  {/* SWAP COURTS BUTTON */}
+                  {/* SWAP COURTS (DRAG & DROP MODE) BUTTON */}
                   <button
                     type="button"
                     onClick={() => {
@@ -1088,20 +955,17 @@ export default function Dashboard({
                         resetSwapMode();
                       } else {
                         setIsSwapMode(true);
-                        setSwapStep('A');
-                        setSwapSetA([]);
-                        setSwapSetB([]);
                       }
                     }}
                     className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-extrabold transition ${
                       isSwapMode
-                        ? 'bg-red-500 text-white hover:bg-red-600'
+                        ? 'bg-amber-500 text-black border border-black/20 hover:bg-amber-400'
                         : 'border border-black/15 bg-[#f7f8f4] text-black hover:bg-[#eef7cf]'
                     }`}
                   >
                     {isSwapMode ? (
                       <>
-                        <X size={14} /> Cancel Swap
+                        <Check size={14} /> Done Swapping
                       </>
                     ) : (
                       <>
@@ -1148,104 +1012,34 @@ export default function Dashboard({
                 </div>
               </div>
 
-              {/* SWAP COURTS STEP-BY-STEP BAR */}
+              {/* DRAG & DROP SWAPPING MODE BANNER */}
               {isSwapMode && (
-                <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex flex-wrap items-center gap-2 text-xs">
-                    <span
-                      className={`rounded-lg px-2.5 py-1 font-black ${
-                        swapStep === 'A'
-                          ? 'bg-[#101310] text-[#d8ff3e]'
-                          : 'bg-red-700 text-white'
-                      }`}
-                    >
-                      Set A ({swapSetA.length}):{' '}
-                      {swapSetA.length > 0
-                        ? swapSetA
-                            .map(
-                              (c) =>
-                                `C${c.court} (${
-                                  c.booking.customerName || 'Walk-in'
-                                })`
-                            )
-                            .join(', ')
-                        : 'None'}
-                    </span>
-
-                    <ArrowRightLeft size={14} className="text-black/50" />
-
-                    <span
-                      className={`rounded-lg px-2.5 py-1 font-black ${
-                        swapStep === 'B'
-                          ? 'bg-amber-600 text-white'
-                          : 'bg-white border border-black/15 text-black/60'
-                      }`}
-                    >
-                      Set B ({swapSetB.length}/{swapSetA.length || '?'}):{' '}
-                      {swapSetB.length > 0
-                        ? swapSetB
-                            .map(
-                              (c) =>
-                                `C${c.court} (${
-                                  c.booking.customerName || 'Walk-in'
-                                })`
-                            )
-                            .join(', ')
-                        : 'None'}
+                <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50/90 px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2 font-bold text-black/80">
+                    <GripVertical size={15} className="shrink-0 text-amber-700" />
+                    <span>
+                      {isSwapping
+                        ? 'Updating court assignment in Supabase...'
+                        : draggedCell
+                        ? `Dragging ${
+                            draggedCell.booking.customerName || 'Walk-in'
+                          } from Court ${draggedCell.court} (${
+                            draggedCell.time
+                          }) — drop onto any court at ${draggedCell.time}`
+                        : 'Drag any booked red cell left or right and drop it onto another court in the same hour to swap or move.'}
                     </span>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
-                    {swapStep === 'A' ? (
-                      <button
-                        type="button"
-                        disabled={swapSetA.length === 0}
-                        onClick={() => setSwapStep('B')}
-                        className="rounded-xl bg-[#101310] px-4 py-2 text-xs font-black text-[#d8ff3e] transition hover:bg-black/85 disabled:opacity-40"
-                      >
-                        Next: Select Set B ({swapSetA.length}) →
-                      </button>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          disabled={isSwapping}
-                          onClick={() => {
-                            setSwapSetB([]);
-                            setSwapStep('A');
-                          }}
-                          className="rounded-xl border border-black/15 bg-white px-3 py-2 text-xs font-bold text-black/70 hover:text-black"
-                        >
-                          ← Edit Set A
-                        </button>
-                        <button
-                          type="button"
-                          disabled={
-                            isSwapping ||
-                            swapSetA.length === 0 ||
-                            swapSetB.length !== swapSetA.length
-                          }
-                          onClick={handleConfirmSwapCourts}
-                          className="flex items-center gap-1.5 rounded-xl bg-[#101310] px-4 py-2 text-xs font-black text-[#d8ff3e] transition hover:bg-black/85 disabled:opacity-40"
-                        >
-                          {isSwapping ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" /> Swapping...
-                            </>
-                          ) : (
-                            <>
-                              <Check size={14} /> Confirm Swap
-                            </>
-                          )}
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {isSwapping && (
+                    <span className="flex items-center gap-1.5 font-black text-amber-800">
+                      <Loader2 size={14} className="animate-spin" /> Swapping...
+                    </span>
+                  )}
                 </div>
               )}
 
               {/* SELECTED BOOKED SLOTS ACTION BAR (MOVE OR CANCEL) */}
-              {selectedBookedCells.length > 0 && (
+              {!isSwapMode && selectedBookedCells.length > 0 && (
                 <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 text-xs">
                     <span className="rounded-lg bg-red-600 px-2.5 py-1 font-black text-white">
@@ -1481,8 +1275,14 @@ export default function Dashboard({
                           const isBookedSelected = selectedBookedCells.some(
                             (c) => c.key === cellKey
                           );
-                          const isSwapA = swapSetA.some((c) => c.key === cellKey);
-                          const isSwapB = swapSetB.some((c) => c.key === cellKey);
+                          const isBeingDragged = draggedCell?.key === cellKey;
+                          const isValidDropTarget =
+                            isSwapMode &&
+                            Boolean(draggedCell) &&
+                            draggedCell?.time === time &&
+                            draggedCell?.key !== cellKey;
+                          const isDragOverTarget =
+                            isValidDropTarget && dragOverKey === cellKey;
                           const isOpenSelected = selectedSlots.some(
                             (s) => s.court === courtNum && s.time === time
                           );
@@ -1494,18 +1294,52 @@ export default function Dashboard({
                           return (
                             <td
                               key={i}
+                              onDragOver={(e) => {
+                                if (isValidDropTarget) {
+                                  e.preventDefault();
+                                  if (dragOverKey !== cellKey) {
+                                    setDragOverKey(cellKey);
+                                  }
+                                }
+                              }}
+                              onDragLeave={() => {
+                                if (dragOverKey === cellKey) {
+                                  setDragOverKey(null);
+                                }
+                              }}
+                              onDrop={(e) => {
+                                e.preventDefault();
+                                handleDropOnCell(courtNum, time);
+                              }}
                               className="p-0 border-r border-black/10 last:border-r-0"
                             >
                               <button
                                 type="button"
+                                draggable={isSwapMode && isBooked && !isSwapping}
+                                onDragStart={() => {
+                                  if (isSwapMode && isBooked && booking) {
+                                    setDraggedCell({
+                                      key: cellKey,
+                                      court: courtNum,
+                                      time,
+                                      booking,
+                                    });
+                                  }
+                                }}
+                                onDragEnd={() => {
+                                  setDraggedCell(null);
+                                  setDragOverKey(null);
+                                }}
                                 onClick={() => handleCellClick(courtNum, time)}
                                 title={
-                                  isBooked
-                                    ? isSwapA
-                                      ? `Set A (${guestName})`
-                                      : isSwapB
-                                      ? `Set B (${guestName})`
-                                      : isBookedSelected
+                                  isSwapMode
+                                    ? isBooked
+                                      ? `Drag ${guestName} (Court ${courtNum}) to swap or move`
+                                      : isValidDropTarget
+                                      ? `Drop here to move to Court ${courtNum}`
+                                      : 'Available'
+                                    : isBooked
+                                    ? isBookedSelected
                                       ? `Selected (${guestName}) — click to unselect`
                                       : `Booked (${guestName}) — click to select`
                                     : isBookingMode
@@ -1514,29 +1348,35 @@ export default function Dashboard({
                                       : 'Click to select slot'
                                     : 'Available (click "Book Court" to book)'
                                 }
-                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors cursor-pointer ${
+                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors ${
                                   isBooked
-                                    ? isSwapA
-                                      ? 'bg-red-800 text-[#d8ff3e] ring-2 ring-inset ring-black'
-                                      : isSwapB
-                                      ? 'bg-amber-500 text-black ring-2 ring-inset ring-black'
+                                    ? isBeingDragged
+                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 ring-2 ring-inset ring-black cursor-grabbing'
+                                      : isDragOverTarget
+                                      ? 'bg-amber-400 text-black ring-2 ring-inset ring-black'
+                                      : isSwapMode
+                                      ? 'bg-red-500 text-white hover:bg-red-600 cursor-grab active:cursor-grabbing'
                                       : isBookedSelected
-                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black'
-                                      : 'bg-red-500 text-white hover:bg-red-600'
+                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black cursor-pointer'
+                                      : 'bg-red-500 text-white hover:bg-red-600 cursor-pointer'
+                                    : isDragOverTarget
+                                    ? 'bg-[#d8ff3e] text-black ring-2 ring-inset ring-black'
+                                    : isValidDropTarget
+                                    ? 'bg-amber-50/70'
                                     : isOpenSelected
-                                    ? 'bg-[#d8ff3e] text-black ring-1 ring-inset ring-black/40'
+                                    ? 'bg-[#d8ff3e] text-black ring-1 ring-inset ring-black/40 cursor-pointer'
                                     : isBookingMode
-                                    ? 'bg-white hover:bg-[#eef7cf]'
+                                    ? 'bg-white hover:bg-[#eef7cf] cursor-pointer'
                                     : 'bg-white cursor-default'
                                 }`}
                               >
-                                {isSwapA
-                                  ? 'A'
-                                  : isSwapB
-                                  ? 'B'
-                                  : isBookedSelected || isOpenSelected
-                                  ? '✓'
-                                  : ''}
+                                {isSwapMode && isBooked ? (
+                                  <GripVertical size={12} className="opacity-80" />
+                                ) : isDragOverTarget ? (
+                                  '⇄'
+                                ) : (
+                                  (isBookedSelected || isOpenSelected) && '✓'
+                                )}
                               </button>
                             </td>
                           );
