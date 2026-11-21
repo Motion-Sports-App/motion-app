@@ -48,7 +48,7 @@ export default function Navbar({
             How it works
           </button>
           <button onClick={onVenueAdminOpen} className="hover:opacity-60 transition">
-            meow meow meow ↗
+            Partners & Venues ↗
           </button>
         </nav>
 
