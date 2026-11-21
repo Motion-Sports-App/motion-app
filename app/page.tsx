@@ -209,6 +209,7 @@ export default function Home() {
     const isSuperAdmin =
       user?.email &&
       [
+        'darylhsu45@gmail.com',
         'mingtan0403@gmail.com',
         'motionsportsapp@gmail.com',
         'kvorakijkamjorn@gmail.com',
