@@ -182,9 +182,21 @@ export default function Home() {
     loadVenues();
   }, []);
 
-  const handleCancelBooking = async (id: string) => {
+   Const handleCancelBooking = async (id: string) => {
     setBookings((old) => old.map((b) => (b.id === id ? { ...b, status: 'Cancelled' } : b)));
     await bookingService.cancel(id);
+  };
+  const handleReseconsttFilters = () => {
+      const hasActiveFilters =
+    activeSport !== 'All sports' ||
+    query.trim() !== '' ||
+    area !== 'Anywhere in Bangkok' ||
+    maxPrice !== 'Any price';
+
+    setActiveSport('All sports');
+    setQuery('')
+    setArea('Anywhere in Bangkok');
+    setMaxPrice('Any price');
   };
 
   const filtered = useMemo(() => {
@@ -209,6 +221,7 @@ export default function Home() {
     const isSuperAdmin =
       user?.email &&
       [
+        'darylhsu45@gmail.com',
         'mingtan0403@gmail.com',
         'motionsportsapp@gmail.com',
         'kvorakijkamjorn@gmail.com',
@@ -398,7 +411,15 @@ export default function Home() {
                 <button
                   onClick={() => setShowFilters(!showFilters)}
                   className="flex items-center justify-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-3 text-sm font-extrabold transition hover:bg-[#c9f02e]"
-                >
+                >                {hasActiveFilters && (
+                  <button 
+                    onClick={handleResetFilters}
+                    className="flex items-center justify-center rounded-xl border border-black/15 bg-white px-4 py-3 text-sm font-bold text-black/70 transition hover:bg-black/5 hover:text-black"
+                  >
+                    Reset
+                  </button>
+                )}
+
                   <SlidersHorizontal size={17} /> Filters <ChevronDown size={15} />
                 </button>
               </div>
@@ -418,7 +439,7 @@ export default function Home() {
                   ))}
                 </div>
               )}
-
+s
               {loading ? (
                 <div className="mt-12 text-center text-sm font-bold text-black/50">Loading courts from database...</div>
               ) : filtered.length ? (
