@@ -24,6 +24,7 @@ import {
   Search,
   LayoutGrid,
   List,
+  Trophy,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
@@ -65,6 +66,42 @@ const toFullSlotLabel = (startHourStr: string) => {
   const hr = parseInt(startHourStr.split(':')[0], 10);
   const nextHr = (hr + 1) % 24;
   return `${String(hr).padStart(2, '0')}:00 - ${String(nextHr).padStart(2, '0')}:00`;
+};
+
+// Normalize sport label for consistent display & comparison (e.g. "badminton" -> "Badminton")
+const formatSportLabel = (raw: string) => {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Extract all sports associated with a venue (supports comma-separated strings or arrays)
+const extractVenueSports = (venue: Venue | null): string[] => {
+  if (!venue) return [];
+  const rawList: string[] = [];
+
+  if (Array.isArray((venue as any).sports)) {
+    (venue as any).sports.forEach((s: unknown) => {
+      if (typeof s === 'string') rawList.push(s);
+    });
+  }
+
+  if (typeof venue.sport === 'string' && venue.sport.trim()) {
+    venue.sport.split(/[,/|]+/).forEach((s) => rawList.push(s));
+  }
+
+  const uniqueMap = new Map<string, string>();
+  rawList.forEach((item) => {
+    const formatted = formatSportLabel(item);
+    if (formatted) {
+      uniqueMap.set(formatted.toUpperCase(), formatted);
+    }
+  });
+
+  return Array.from(uniqueMap.values());
 };
 
 // Determine if a booking is in the past based on current date and slot end time
@@ -135,6 +172,7 @@ export default function Dashboard({
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalTodayStr());
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [selectedMatrixSport, setSelectedMatrixSport] = useState<string>('');
 
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -246,11 +284,14 @@ export default function Dashboard({
         );
       });
 
+      const primaryVenueSport =
+        extractVenueSports(selectedVenue)[0] || 'Badminton';
+
       const mapped: DashboardBooking[] = venueRows.map((b: any) => ({
         id: b.booking_code || String(b.id),
         dbId: String(b.id),
         venue: b.venue_name || selectedVenue.name || 'Court Booking',
-        sport: b.sport || selectedVenue.sport || 'Sports',
+        sport: formatSportLabel(String(b.sport || primaryVenueSport)),
         date: b.booking_date || b.date,
         time: b.time_slot || b.booking_time || '',
         price: Number(b.total_amount ?? b.price ?? 0),
@@ -268,11 +309,44 @@ export default function Dashboard({
     } else if (error) {
       console.error('Error fetching venue bookings:', error);
     }
-  }, [selectedVenue?.id, selectedVenue?.name, selectedVenue?.sport]);
+  }, [selectedVenue]);
 
   useEffect(() => {
     fetchVenueBookings();
   }, [fetchVenueBookings]);
+
+  // All sports available at this venue (from venue metadata + any existing bookings)
+  const venueSportOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    extractVenueSports(selectedVenue).forEach((s) => {
+      map.set(s.toUpperCase(), s);
+    });
+
+    venueBookings.forEach((b) => {
+      const formatted = formatSportLabel(String(b.sport || ''));
+      if (formatted) {
+        map.set(formatted.toUpperCase(), formatted);
+      }
+    });
+
+    if (map.size === 0) {
+      map.set('BADMINTON', 'Badminton');
+    }
+
+    return Array.from(map.values());
+  }, [selectedVenue, venueBookings]);
+
+  // Default / sync selectedMatrixSport whenever the venue or its sport options change
+  useEffect(() => {
+    if (venueSportOptions.length === 0) return;
+    const isStillValid = venueSportOptions.some(
+      (s) => s.toUpperCase() === selectedMatrixSport.toUpperCase()
+    );
+    if (!selectedMatrixSport || !isStillValid) {
+      setSelectedMatrixSport(venueSportOptions[0]);
+    }
+  }, [venueSportOptions, selectedMatrixSport]);
 
   const [totalCourts, setTotalCourts] = useState<number>(1);
   const [openTime, setOpenTime] = useState<string>('08:00');
@@ -338,12 +412,16 @@ export default function Dashboard({
     });
   }, [openTime, closeTime]);
 
-  // Map confirmed bookings on selectedDate onto specific (Court, Time) cells
+  // Map confirmed bookings on selectedDate & selectedMatrixSport onto specific (Court, Time) cells
   const bookedCellMap = useMemo(() => {
     const map: Record<string, DashboardBooking> = {};
-    const activeOnDate = venueBookings.filter(
-      (b) => b.status === 'Confirmed' && b.date === selectedDate
-    );
+    const targetSportUpper = selectedMatrixSport.trim().toUpperCase();
+
+    const activeOnDate = venueBookings.filter((b) => {
+      if (b.status !== 'Confirmed' || b.date !== selectedDate) return false;
+      if (!targetSportUpper) return true;
+      return String(b.sport || '').trim().toUpperCase() === targetSportUpper;
+    });
 
     const fallbackUsedByTime: Record<string, number> = {};
 
@@ -384,7 +462,7 @@ export default function Dashboard({
     });
 
     return map;
-  }, [venueBookings, selectedDate, totalCourts]);
+  }, [venueBookings, selectedDate, selectedMatrixSport, totalCourts]);
 
   // Determine which courts are conflict-free across all currently selected booked slots
   const validMoveCourts = useMemo(() => {
@@ -434,7 +512,7 @@ export default function Dashboard({
     };
   }, [venueBookings, ownedVenues, totalCourts, activeHours, bookedCellMap]);
 
-  // Master Reservation List: Split into Current/Active vs Past, then filter by Booking ID & Sport
+  // Master Reservation List: Split into Current/Active vs Past
   const { activeTimeBookings, pastTimeBookings } = useMemo(() => {
     const activeList: DashboardBooking[] = [];
     const pastList: DashboardBooking[] = [];
@@ -453,24 +531,21 @@ export default function Dashboard({
   const baseTabBookings =
     masterTimeTab === 'active' ? activeTimeBookings : pastTimeBookings;
 
+  // Keep all sport filter pills visible regardless of whether Current/Active or Past tab is selected
   const availableMasterSports = useMemo(() => {
-    return Array.from(
-      new Set(
-        baseTabBookings
-          .map((b) => String(b.sport || '').trim().toUpperCase())
-          .filter(Boolean)
-      )
-    );
-  }, [baseTabBookings]);
+    const sportSet = new Set<string>();
 
-  useEffect(() => {
-    if (
-      masterSportFilter !== 'ALL' &&
-      !availableMasterSports.includes(masterSportFilter)
-    ) {
-      setMasterSportFilter('ALL');
-    }
-  }, [availableMasterSports, masterSportFilter]);
+    venueSportOptions.forEach((s) => {
+      if (s.trim()) sportSet.add(s.trim().toUpperCase());
+    });
+
+    venueBookings.forEach((b) => {
+      const s = String(b.sport || '').trim().toUpperCase();
+      if (s) sportSet.add(s);
+    });
+
+    return Array.from(sportSet);
+  }, [venueSportOptions, venueBookings]);
 
   const filteredMasterBookings = useMemo(() => {
     const query = masterSearchQuery.trim().toLowerCase();
@@ -625,7 +700,11 @@ export default function Dashboard({
           booking_code: newCode,
           venue_id: selectedVenue.id,
           venue_name: selectedVenue.name,
-          sport: booking.sport || selectedVenue.sport || 'Badminton',
+          sport:
+            booking.sport ||
+            selectedMatrixSport ||
+            venueSportOptions[0] ||
+            'Badminton',
           booking_date: booking.date,
           booking_time: swappedLabel,
           time_slot: swappedLabel,
@@ -741,6 +820,8 @@ export default function Dashboard({
       );
       const guestName = walkInName.trim() || 'Walk-in Player';
       const frontDeskEmail = user?.email || 'frontdesk@motion.app';
+      const bookingSport =
+        selectedMatrixSport || venueSportOptions[0] || 'Badminton';
 
       // Create each selected slot via bookingService.createViaRPC so `create_court_booking` handles capacity & booking_code
       const results = await Promise.all(
@@ -748,7 +829,7 @@ export default function Dashboard({
           bookingService.createViaRPC({
             venueId: selectedVenue.id,
             venueName: selectedVenue.name,
-            sport: selectedVenue.sport || 'Badminton',
+            sport: bookingSport,
             date: selectedDate,
             timeSlot: `${toFullSlotLabel(slot.time)} · Court ${slot.court}`,
             courtCount: 1,
@@ -940,6 +1021,7 @@ export default function Dashboard({
               value={selectedVenue?.id || ''}
               onChange={(e) => {
                 setSelectedVenueId(e.target.value);
+                setSelectedMatrixSport('');
                 setIsEditingConfig(false);
                 setIsBookingMode(false);
                 setSelectedSlots([]);
@@ -1008,14 +1090,41 @@ export default function Dashboard({
                   </h2>
                   <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
                     {isSwapMode
-                      ? 'Swapping Mode Active: Drag any red booked slot and drop it onto another court in the same hour to swap or move.'
+                      ? `Swapping Mode Active (${selectedMatrixSport}): Drag any red booked slot and drop it onto another court in the same hour to swap or move.`
                       : isBookingMode
-                      ? 'Select one or more open white slots below, then confirm to book.'
-                      : 'Available vs Booked (click red slots to select, move, or cancel).'}
+                      ? `Select one or more open white ${selectedMatrixSport} slots below, then confirm to book.`
+                      : `Showing ${selectedMatrixSport} courts — Available vs Booked (click red slots to select, move, or cancel).`}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  {/* SPORT SELECTOR DROPDOWN FOR MULTI-SPORT VENUES */}
+                  <label className="flex items-center gap-2 rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
+                    <Trophy size={14} className="text-[#81971d] dark:text-[#d8ff3e]" />
+                    <select
+                      aria-label="Select venue sport"
+                      value={selectedMatrixSport}
+                      onChange={(e) => {
+                        setSelectedMatrixSport(e.target.value);
+                        setSelectedSlots([]);
+                        setSelectedBookedCells([]);
+                        resetSwapMode();
+                      }}
+                      className="bg-transparent font-extrabold text-[#101310] dark:text-[#F7F8F4] outline-none cursor-pointer"
+                    >
+                      {venueSportOptions.map((sport) => (
+                        <option
+                          key={sport}
+                          value={sport}
+                          className="bg-white dark:bg-[#16171A] text-[#101310] dark:text-[#F7F8F4]"
+                        >
+                          {sport}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {/* DATE PICKER */}
                   <label className="flex items-center gap-2 rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
                     <Calendar size={15} />
                     <input
@@ -1256,6 +1365,7 @@ export default function Dashboard({
                   <div className="flex flex-wrap items-center gap-3 text-xs">
                     <span className="rounded-lg bg-[#101310] dark:bg-[#d8ff3e] px-2.5 py-1 font-black text-[#d8ff3e] dark:text-[#101310]">
                       {selectedSlots.length}{' '}
+                      {selectedMatrixSport}{' '}
                       {selectedSlots.length === 1 ? 'Slot' : 'Slots'} Selected
                     </span>
                     <span className="font-extrabold text-[#101310] dark:text-[#F7F8F4]">
@@ -1708,7 +1818,7 @@ export default function Dashboard({
                   )}
                 </div>
 
-                {/* Sport Filter Buttons */}
+                {/* Sport Filter Buttons (Persists across Current/Active and Past tabs) */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[11px] font-bold text-black/50 dark:text-[#F7F8F4]/50">
                     Sport:
@@ -1728,23 +1838,29 @@ export default function Dashboard({
                     All ({baseTabBookings.length})
                   </button>
 
-                  {availableMasterSports.map((sport) => (
-                    <button
-                      key={sport}
-                      type="button"
-                      onClick={() => {
-                        setMasterSportFilter(sport);
-                        setMasterVisibleCount(10);
-                      }}
-                      className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
-                        masterSportFilter === sport
-                          ? 'border-[#81971d] dark:border-[#d8ff3e] bg-[#81971d] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
-                          : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
-                      }`}
-                    >
-                      {sport}
-                    </button>
-                  ))}
+                  {availableMasterSports.map((sport) => {
+                    const countInTab = baseTabBookings.filter(
+                      (b) => String(b.sport || '').trim().toUpperCase() === sport
+                    ).length;
+
+                    return (
+                      <button
+                        key={sport}
+                        type="button"
+                        onClick={() => {
+                          setMasterSportFilter(sport);
+                          setMasterVisibleCount(10);
+                        }}
+                        className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
+                          masterSportFilter === sport
+                            ? 'border-[#81971d] dark:border-[#d8ff3e] bg-[#81971d] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
+                            : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
+                        }`}
+                      >
+                        {sport} ({countInTab})
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
