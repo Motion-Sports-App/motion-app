@@ -345,7 +345,7 @@ export default function Home() {
                   move<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
                 </span>
                 <span className="relative z-10">?</span><br />
-                <span className="text-[#849c24]">Try Motion.</span>
+                <span className="text-[#849c24]">It's Motion.</span>
               </h1>
 
               <p className="mt-7 max-w-lg text-base leading-7 text-black/60 dark:text-[#F7F8F4]/70 sm:text-lg">
