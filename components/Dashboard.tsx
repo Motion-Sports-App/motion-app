@@ -24,6 +24,7 @@ import {
   Search,
   LayoutGrid,
   List,
+  Trophy,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
@@ -43,6 +44,17 @@ type SelectedBookedCell = {
   court: number;
   time: string;
   booking: DashboardBooking;
+};
+
+type ClusterCellVisual = {
+  topEdge: boolean;
+  bottomEdge: boolean;
+  leftEdge: boolean;
+  rightEdge: boolean;
+  showLabel: boolean;
+  label: string;
+  offsetXPercent: number;
+  offsetYPercent: number;
 };
 
 const DEFAULT_HOURS = [
@@ -65,6 +77,75 @@ const toFullSlotLabel = (startHourStr: string) => {
   const hr = parseInt(startHourStr.split(':')[0], 10);
   const nextHr = (hr + 1) % 24;
   return `${String(hr).padStart(2, '0')}:00 - ${String(nextHr).padStart(2, '0')}:00`;
+};
+
+// Normalize sport label for consistent display & comparison (e.g. "badminton" -> "Badminton")
+const formatSportLabel = (raw: string) => {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  return trimmed
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+// Extract all sports associated with a venue (supports comma-separated strings or arrays)
+const extractVenueSports = (venue: Venue | null): string[] => {
+  if (!venue) return [];
+  const rawList: string[] = [];
+
+  if (Array.isArray((venue as any).sports)) {
+    (venue as any).sports.forEach((s: unknown) => {
+      if (typeof s === 'string') rawList.push(s);
+    });
+  }
+
+  if (typeof venue.sport === 'string' && venue.sport.trim()) {
+    venue.sport.split(/[,/|]+/).forEach((s) => rawList.push(s));
+  }
+
+  const uniqueMap = new Map<string, string>();
+  rawList.forEach((item) => {
+    const formatted = formatSportLabel(item);
+    if (formatted) {
+      uniqueMap.set(formatted.toUpperCase(), formatted);
+    }
+  });
+
+  return Array.from(uniqueMap.values());
+};
+
+// Clean display label for the matrix block ("ming", "amy", "tonnam", or "Walk-in")
+const getMatrixBookerLabel = (booking: DashboardBooking): string => {
+  const rawName = String(booking.customerName || '').trim();
+  if (rawName) {
+    // Strip "(Front Desk)" suffix
+    const cleaned = rawName.replace(/\s*\(front\s*desk\)\s*$/i, '').trim();
+    if (!cleaned || /^walk[-\s]?in(\s+player)?$/i.test(cleaned)) {
+      return 'Walk-in';
+    }
+    return cleaned;
+  }
+
+  const rawEmail = String(booking.customerEmail || '').trim();
+  if (rawEmail && !rawEmail.toLowerCase().startsWith('frontdesk@')) {
+    return rawEmail.split('@')[0];
+  }
+
+  return 'Walk-in';
+};
+
+// Stable identity key for grouping adjacent bookings by the same person
+const getBookerIdentityKey = (booking: DashboardBooking): string => {
+  const label = getMatrixBookerLabel(booking).toLowerCase();
+  if (label === 'walk-in') {
+    // Keep separate walk-in bookings distinct unless they belong to the same multi-court/multi-hour booking record
+    return `walkin:${booking.dbId || booking.id}`;
+  }
+  if (booking.userId) {
+    return `user:${booking.userId}`;
+  }
+  return `name:${label}`;
 };
 
 // Determine if a booking is in the past based on current date and slot end time
@@ -135,6 +216,7 @@ export default function Dashboard({
   const [activeRole, setActiveRole] = useState<'venue' | 'coach'>('venue');
   const [selectedDate, setSelectedDate] = useState<string>(() => getLocalTodayStr());
   const [selectedVenueId, setSelectedVenueId] = useState<string>('');
+  const [selectedMatrixSport, setSelectedMatrixSport] = useState<string>('');
 
   const [isEditingConfig, setIsEditingConfig] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -246,11 +328,14 @@ export default function Dashboard({
         );
       });
 
+      const primaryVenueSport =
+        extractVenueSports(selectedVenue)[0] || 'Badminton';
+
       const mapped: DashboardBooking[] = venueRows.map((b: any) => ({
         id: b.booking_code || String(b.id),
         dbId: String(b.id),
         venue: b.venue_name || selectedVenue.name || 'Court Booking',
-        sport: b.sport || selectedVenue.sport || 'Sports',
+        sport: formatSportLabel(String(b.sport || primaryVenueSport)),
         date: b.booking_date || b.date,
         time: b.time_slot || b.booking_time || '',
         price: Number(b.total_amount ?? b.price ?? 0),
@@ -268,11 +353,44 @@ export default function Dashboard({
     } else if (error) {
       console.error('Error fetching venue bookings:', error);
     }
-  }, [selectedVenue?.id, selectedVenue?.name, selectedVenue?.sport]);
+  }, [selectedVenue]);
 
   useEffect(() => {
     fetchVenueBookings();
   }, [fetchVenueBookings]);
+
+  // All sports available at this venue (from venue metadata + any existing bookings)
+  const venueSportOptions = useMemo(() => {
+    const map = new Map<string, string>();
+
+    extractVenueSports(selectedVenue).forEach((s) => {
+      map.set(s.toUpperCase(), s);
+    });
+
+    venueBookings.forEach((b) => {
+      const formatted = formatSportLabel(String(b.sport || ''));
+      if (formatted) {
+        map.set(formatted.toUpperCase(), formatted);
+      }
+    });
+
+    if (map.size === 0) {
+      map.set('BADMINTON', 'Badminton');
+    }
+
+    return Array.from(map.values());
+  }, [selectedVenue, venueBookings]);
+
+  // Default / sync selectedMatrixSport whenever the venue or its sport options change
+  useEffect(() => {
+    if (venueSportOptions.length === 0) return;
+    const isStillValid = venueSportOptions.some(
+      (s) => s.toUpperCase() === selectedMatrixSport.toUpperCase()
+    );
+    if (!selectedMatrixSport || !isStillValid) {
+      setSelectedMatrixSport(venueSportOptions[0]);
+    }
+  }, [venueSportOptions, selectedMatrixSport]);
 
   const [totalCourts, setTotalCourts] = useState<number>(1);
   const [openTime, setOpenTime] = useState<string>('08:00');
@@ -338,19 +456,41 @@ export default function Dashboard({
     });
   }, [openTime, closeTime]);
 
-  // Map confirmed bookings on selectedDate onto specific (Court, Time) cells
+  // Map confirmed bookings on selectedDate & selectedMatrixSport onto specific (Court, Time) cells
   const bookedCellMap = useMemo(() => {
     const map: Record<string, DashboardBooking> = {};
-    const activeOnDate = venueBookings.filter(
-      (b) => b.status === 'Confirmed' && b.date === selectedDate
-    );
+    const targetSportUpper = selectedMatrixSport.trim().toUpperCase();
+
+    const activeOnDate = venueBookings.filter((b) => {
+      if (b.status !== 'Confirmed' || b.date !== selectedDate) return false;
+      if (!targetSportUpper) return true;
+      return String(b.sport || '').trim().toUpperCase() === targetSportUpper;
+    });
 
     const fallbackUsedByTime: Record<string, number> = {};
 
     activeOnDate.forEach((b) => {
       const rawTime = String(b.time || '');
-      const timeMatch = rawTime.match(/\d{2}:\d{2}/);
-      const slotTime = timeMatch ? timeMatch[0] : rawTime;
+      const rangeMatch = rawTime.match(/(\d{2}):\d{2}\s*[-–]\s*(\d{2}):\d{2}/);
+      const singleMatch = rawTime.match(/(\d{2}):\d{2}/);
+
+      let slotTimes: string[] = [];
+      if (rangeMatch) {
+        const startHr = parseInt(rangeMatch[1], 10);
+        const rawEndHr = parseInt(rangeMatch[2], 10);
+        const endHr = rawEndHr === 0 && startHr > 0 ? 24 : rawEndHr;
+        if (endHr > startHr) {
+          for (let h = startHr; h < endHr; h++) {
+            slotTimes.push(`${String(h).padStart(2, '0')}:00`);
+          }
+        } else {
+          slotTimes = [`${String(startHr).padStart(2, '0')}:00`];
+        }
+      } else if (singleMatch) {
+        slotTimes = [singleMatch[0]];
+      } else {
+        slotTimes = [rawTime];
+      }
 
       // Support both "Court 2" and "Courts 1, 2"
       const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
@@ -361,30 +501,180 @@ export default function Dashboard({
             .filter((n) => !isNaN(n) && n >= 1 && n <= totalCourts)
         : [];
 
-      if (explicitCourts.length > 0) {
-        explicitCourts.forEach((c) => {
-          map[`C${c}_${slotTime}`] = b;
-        });
-      } else {
-        const qty = Math.max(1, Number(b.courtCount || 1));
-        for (let q = 0; q < qty; q++) {
-          let assignedCourt = (fallbackUsedByTime[slotTime] || 0) + 1;
-          while (
-            map[`C${assignedCourt}_${slotTime}`] &&
-            assignedCourt <= totalCourts
-          ) {
-            assignedCourt++;
-          }
-          if (assignedCourt <= totalCourts) {
-            fallbackUsedByTime[slotTime] = assignedCourt;
-            map[`C${assignedCourt}_${slotTime}`] = b;
+      slotTimes.forEach((slotTime) => {
+        if (explicitCourts.length > 0) {
+          explicitCourts.forEach((c) => {
+            map[`C${c}_${slotTime}`] = b;
+          });
+        } else {
+          const qty = Math.max(1, Number(b.courtCount || 1));
+          for (let q = 0; q < qty; q++) {
+            let assignedCourt = (fallbackUsedByTime[slotTime] || 0) + 1;
+            while (
+              map[`C${assignedCourt}_${slotTime}`] &&
+              assignedCourt <= totalCourts
+            ) {
+              assignedCourt++;
+            }
+            if (assignedCourt <= totalCourts) {
+              fallbackUsedByTime[slotTime] = assignedCourt;
+              map[`C${assignedCourt}_${slotTime}`] = b;
+            }
           }
         }
-      }
+      });
     });
 
     return map;
-  }, [venueBookings, selectedDate, totalCourts]);
+  }, [venueBookings, selectedDate, selectedMatrixSport, totalCourts]);
+
+  // Group contiguous booked cells by booker to compute outer perimeter borders & maximum-clearance label placement
+  const bookingClusterMeta = useMemo(() => {
+    const meta: Record<string, ClusterCellVisual> = {};
+    const visited = new Set<string>();
+    const rowCount = activeHours.length;
+
+    const getIdentityAt = (r: number, c: number): string | null => {
+      if (r < 0 || r >= rowCount || c < 1 || c > totalCourts) return null;
+      const b = bookedCellMap[`C${c}_${activeHours[r]}`];
+      return b ? getBookerIdentityKey(b) : null;
+    };
+
+    for (let r = 0; r < rowCount; r++) {
+      for (let c = 1; c <= totalCourts; c++) {
+        const startKey = `C${c}_${activeHours[r]}`;
+        const startBooking = bookedCellMap[startKey];
+        if (!startBooking || visited.has(startKey)) continue;
+
+        const identity = getBookerIdentityKey(startBooking);
+        const component: { r: number; c: number; key: string }[] = [];
+        const queue: { r: number; c: number }[] = [{ r, c }];
+        visited.add(startKey);
+
+        while (queue.length > 0) {
+          const curr = queue.shift()!;
+          const currKey = `C${curr.c}_${activeHours[curr.r]}`;
+          component.push({ r: curr.r, c: curr.c, key: currKey });
+
+          const neighbors = [
+            { r: curr.r - 1, c: curr.c },
+            { r: curr.r + 1, c: curr.c },
+            { r: curr.r, c: curr.c - 1 },
+            { r: curr.r, c: curr.c + 1 },
+          ];
+
+          for (const nb of neighbors) {
+            if (nb.r < 0 || nb.r >= rowCount || nb.c < 1 || nb.c > totalCourts) {
+              continue;
+            }
+            const nbKey = `C${nb.c}_${activeHours[nb.r]}`;
+            if (visited.has(nbKey)) continue;
+            const nbBooking = bookedCellMap[nbKey];
+            if (nbBooking && getBookerIdentityKey(nbBooking) === identity) {
+              visited.add(nbKey);
+              queue.push(nb);
+            }
+          }
+        }
+
+        const memberSet = new Set(component.map((item) => `${item.r}:${item.c}`));
+
+        // Geometric centroid used only as a tie-breaker among equally safe interior points
+        const sumR = component.reduce((acc, item) => acc + item.r, 0);
+        const sumC = component.reduce((acc, item) => acc + item.c, 0);
+        const centerR = sumR / component.length;
+        const centerC = sumC / component.length;
+
+        // Generate candidate label centers: cell centers (0.0) and shared internal edges (+0.5)
+        const candidates: { posR: number; posC: number }[] = [];
+        for (const item of component) {
+          candidates.push({ posR: item.r, posC: item.c });
+          const hasRight = memberSet.has(`${item.r}:${item.c + 1}`);
+          const hasDown = memberSet.has(`${item.r + 1}:${item.c}`);
+          const hasDiag = memberSet.has(`${item.r + 1}:${item.c + 1}`);
+
+          if (hasRight) {
+            candidates.push({ posR: item.r, posC: item.c + 0.5 });
+          }
+          if (hasDown) {
+            candidates.push({ posR: item.r + 0.5, posC: item.c });
+          }
+          if (hasRight && hasDown && hasDiag) {
+            candidates.push({ posR: item.r + 0.5, posC: item.c + 0.5 });
+          }
+        }
+
+        // Compute distance from any candidate (posR, posC) to the nearest outer boundary of the cluster
+        // Note: rows are ~32px tall while columns are ~110px wide, so weight vertical clearance higher
+        const getBoundaryClearance = (posR: number, posC: number): number => {
+          let minClearance = Infinity;
+          const minR = Math.min(...component.map((x) => x.r)) - 1;
+          const maxR = Math.max(...component.map((x) => x.r)) + 1;
+          const minC = Math.min(...component.map((x) => x.c)) - 1;
+          const maxC = Math.max(...component.map((x) => x.c)) + 1;
+
+          for (let rr = minR; rr <= maxR; rr++) {
+            for (let cc = minC; cc <= maxC; cc++) {
+              if (memberSet.has(`${rr}:${cc}`)) continue;
+              // Distance from (posR, posC) to the unit square [rr - 0.5, rr + 0.5] x [cc - 0.5, cc + 0.5]
+              const dR = Math.max(0, Math.abs(posR - rr) - 0.5);
+              const dC = Math.max(0, Math.abs(posC - cc) - 0.5);
+              // Weight vertical clearance (1.0) vs horizontal clearance (2.2) to match cell aspect ratio
+              const weightedDist = Math.hypot(dR * 1.0, dC * 2.2);
+              if (weightedDist < minClearance) {
+                minClearance = weightedDist;
+              }
+            }
+          }
+          return minClearance;
+        };
+
+        // Pick the candidate with maximum clearance from all borders (pole of inaccessibility)
+        let bestPos = { posR: component[0].r, posC: component[0].c };
+        let bestScore = -Infinity;
+
+        for (const cand of candidates) {
+          const clearance = getBoundaryClearance(cand.posR, cand.posC);
+          const distToCentroid = Math.hypot(
+            cand.posR - centerR,
+            cand.posC - centerC
+          );
+          // Primary priority: max clearance from edges; tiny tie-breaker: closer to centroid
+          const score = clearance * 100 - distToCentroid;
+          if (score > bestScore) {
+            bestScore = score;
+            bestPos = cand;
+          }
+        }
+
+        // Anchor to the member cell whose top-left/center owns bestPos (floor handles .5 cleanly)
+        const anchorR = Math.floor(bestPos.posR);
+        const anchorC = Math.floor(bestPos.posC);
+        const anchor =
+          component.find((item) => item.r === anchorR && item.c === anchorC) ||
+          component[0];
+
+        const label = getMatrixBookerLabel(startBooking);
+        const offsetXPercent = (bestPos.posC - anchor.c) * 100;
+        const offsetYPercent = (bestPos.posR - anchor.r) * 100;
+
+        for (const item of component) {
+          meta[item.key] = {
+            topEdge: getIdentityAt(item.r - 1, item.c) !== identity,
+            bottomEdge: getIdentityAt(item.r + 1, item.c) !== identity,
+            leftEdge: getIdentityAt(item.r, item.c - 1) !== identity,
+            rightEdge: getIdentityAt(item.r, item.c + 1) !== identity,
+            showLabel: item.key === anchor.key,
+            label,
+            offsetXPercent: item.key === anchor.key ? offsetXPercent : 0,
+            offsetYPercent: item.key === anchor.key ? offsetYPercent : 0,
+          };
+        }
+      }
+    }
+
+    return meta;
+  }, [bookedCellMap, activeHours, totalCourts]);
 
   // Determine which courts are conflict-free across all currently selected booked slots
   const validMoveCourts = useMemo(() => {
@@ -434,7 +724,7 @@ export default function Dashboard({
     };
   }, [venueBookings, ownedVenues, totalCourts, activeHours, bookedCellMap]);
 
-  // Master Reservation List: Split into Current/Active vs Past, then filter by Booking ID & Sport
+  // Master Reservation List: Split into Current/Active vs Past
   const { activeTimeBookings, pastTimeBookings } = useMemo(() => {
     const activeList: DashboardBooking[] = [];
     const pastList: DashboardBooking[] = [];
@@ -453,24 +743,21 @@ export default function Dashboard({
   const baseTabBookings =
     masterTimeTab === 'active' ? activeTimeBookings : pastTimeBookings;
 
+  // Keep all sport filter pills visible regardless of whether Current/Active or Past tab is selected
   const availableMasterSports = useMemo(() => {
-    return Array.from(
-      new Set(
-        baseTabBookings
-          .map((b) => String(b.sport || '').trim().toUpperCase())
-          .filter(Boolean)
-      )
-    );
-  }, [baseTabBookings]);
+    const sportSet = new Set<string>();
 
-  useEffect(() => {
-    if (
-      masterSportFilter !== 'ALL' &&
-      !availableMasterSports.includes(masterSportFilter)
-    ) {
-      setMasterSportFilter('ALL');
-    }
-  }, [availableMasterSports, masterSportFilter]);
+    venueSportOptions.forEach((s) => {
+      if (s.trim()) sportSet.add(s.trim().toUpperCase());
+    });
+
+    venueBookings.forEach((b) => {
+      const s = String(b.sport || '').trim().toUpperCase();
+      if (s) sportSet.add(s);
+    });
+
+    return Array.from(sportSet);
+  }, [venueSportOptions, venueBookings]);
 
   const filteredMasterBookings = useMemo(() => {
     const query = masterSearchQuery.trim().toLowerCase();
@@ -625,7 +912,11 @@ export default function Dashboard({
           booking_code: newCode,
           venue_id: selectedVenue.id,
           venue_name: selectedVenue.name,
-          sport: booking.sport || selectedVenue.sport || 'Badminton',
+          sport:
+            booking.sport ||
+            selectedMatrixSport ||
+            venueSportOptions[0] ||
+            'Badminton',
           booking_date: booking.date,
           booking_time: swappedLabel,
           time_slot: swappedLabel,
@@ -741,6 +1032,8 @@ export default function Dashboard({
       );
       const guestName = walkInName.trim() || 'Walk-in Player';
       const frontDeskEmail = user?.email || 'frontdesk@motion.app';
+      const bookingSport =
+        selectedMatrixSport || venueSportOptions[0] || 'Badminton';
 
       // Create each selected slot via bookingService.createViaRPC so `create_court_booking` handles capacity & booking_code
       const results = await Promise.all(
@@ -748,7 +1041,7 @@ export default function Dashboard({
           bookingService.createViaRPC({
             venueId: selectedVenue.id,
             venueName: selectedVenue.name,
-            sport: selectedVenue.sport || 'Badminton',
+            sport: bookingSport,
             date: selectedDate,
             timeSlot: `${toFullSlotLabel(slot.time)} · Court ${slot.court}`,
             courtCount: 1,
@@ -940,6 +1233,7 @@ export default function Dashboard({
               value={selectedVenue?.id || ''}
               onChange={(e) => {
                 setSelectedVenueId(e.target.value);
+                setSelectedMatrixSport('');
                 setIsEditingConfig(false);
                 setIsBookingMode(false);
                 setSelectedSlots([]);
@@ -1008,14 +1302,41 @@ export default function Dashboard({
                   </h2>
                   <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
                     {isSwapMode
-                      ? 'Swapping Mode Active: Drag any red booked slot and drop it onto another court in the same hour to swap or move.'
+                      ? `Swapping Mode Active (${selectedMatrixSport}): Drag any red booked slot and drop it onto another court in the same hour to swap or move.`
                       : isBookingMode
-                      ? 'Select one or more open white slots below, then confirm to book.'
-                      : 'Available vs Booked (click red slots to select, move, or cancel).'}
+                      ? `Select one or more open white ${selectedMatrixSport} slots below, then confirm to book.`
+                      : `Showing ${selectedMatrixSport} courts — Available vs Booked (click red slots to select, move, or cancel).`}
                   </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2.5">
+                  {/* SPORT SELECTOR DROPDOWN FOR MULTI-SPORT VENUES */}
+                  <label className="flex items-center gap-2 rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
+                    <Trophy size={14} className="text-[#81971d] dark:text-[#d8ff3e]" />
+                    <select
+                      aria-label="Select venue sport"
+                      value={selectedMatrixSport}
+                      onChange={(e) => {
+                        setSelectedMatrixSport(e.target.value);
+                        setSelectedSlots([]);
+                        setSelectedBookedCells([]);
+                        resetSwapMode();
+                      }}
+                      className="bg-transparent font-extrabold text-[#101310] dark:text-[#F7F8F4] outline-none cursor-pointer"
+                    >
+                      {venueSportOptions.map((sport) => (
+                        <option
+                          key={sport}
+                          value={sport}
+                          className="bg-white dark:bg-[#16171A] text-[#101310] dark:text-[#F7F8F4]"
+                        >
+                          {sport}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {/* DATE PICKER */}
                   <label className="flex items-center gap-2 rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
                     <Calendar size={15} />
                     <input
@@ -1256,6 +1577,7 @@ export default function Dashboard({
                   <div className="flex flex-wrap items-center gap-3 text-xs">
                     <span className="rounded-lg bg-[#101310] dark:bg-[#d8ff3e] px-2.5 py-1 font-black text-[#d8ff3e] dark:text-[#101310]">
                       {selectedSlots.length}{' '}
+                      {selectedMatrixSport}{' '}
                       {selectedSlots.length === 1 ? 'Slot' : 'Slots'} Selected
                     </span>
                     <span className="font-extrabold text-[#101310] dark:text-[#F7F8F4]">
@@ -1364,7 +1686,7 @@ export default function Dashboard({
 
               {/* MATRIX TABLE */}
               <div className="mt-4 overflow-x-auto rounded-xl border border-black/15 dark:border-white/10">
-                <table className="w-full text-left border-collapse min-w-[600px]">
+                <table className="w-full table-fixed text-left border-separate border-spacing-0 min-w-[600px]">
                   <thead>
                     <tr className="bg-[#101310] text-white text-[11px] font-black uppercase">
                       <th className="px-3 py-2 border-r border-white/10 w-24">
@@ -1380,10 +1702,16 @@ export default function Dashboard({
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10 dark:divide-white/10 text-xs">
-                    {activeHours.map((time) => (
+                  <tbody className="text-xs">
+                    {activeHours.map((time, rowIdx) => (
                       <tr key={time}>
-                        <td className="px-3 py-1 font-extrabold bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border-r border-black/10 dark:border-white/10">
+                        <td
+                          className={`px-3 py-1 font-extrabold bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border-r border-black/10 dark:border-white/10 ${
+                            rowIdx > 0
+                              ? 'border-t border-black/10 dark:border-white/10'
+                              : ''
+                          }`}
+                        >
                           {time}
                         </td>
                         {Array.from({ length: totalCourts }).map((_, i) => {
@@ -1391,6 +1719,10 @@ export default function Dashboard({
                           const cellKey = `C${courtNum}_${time}`;
                           const booking = bookedCellMap[cellKey];
                           const isBooked = Boolean(booking);
+                          const cluster = isBooked
+                            ? bookingClusterMeta[cellKey]
+                            : undefined;
+
                           const isBookedSelected = selectedBookedCells.some(
                             (c) => c.key === cellKey
                           );
@@ -1405,10 +1737,42 @@ export default function Dashboard({
                           const isOpenSelected = selectedSlots.some(
                             (s) => s.court === courtNum && s.time === time
                           );
-                          const guestName =
-                            booking?.customerName ||
-                            booking?.customerEmail ||
-                            'Walk-in';
+                          const guestName = booking
+                            ? getMatrixBookerLabel(booking)
+                            : 'Walk-in';
+
+                          // Draw light internal grid lines only when not inside a merged booking cluster
+                          const cellGridBorders = [
+                            rowIdx > 0 && (!cluster || cluster.topEdge)
+                              ? 'border-t border-black/10 dark:border-white/10'
+                              : '',
+                            i < totalCourts - 1 &&
+                            (!cluster || cluster.rightEdge)
+                              ? 'border-r border-black/10 dark:border-white/10'
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ');
+
+                          // Draw crisp 2px black perimeter around each contiguous booking block and eliminate vertical white seams
+                          const bookingPerimeterClasses = cluster
+                            ? [
+                                cluster.topEdge
+                                  ? 'border-t-2 border-t-[#101310] dark:border-t-[#F7F8F4]'
+                                  : '-mt-[1px] !h-[33px]',
+                                cluster.bottomEdge
+                                  ? 'border-b-2 border-b-[#101310] dark:border-b-[#F7F8F4]'
+                                  : '',
+                                cluster.leftEdge
+                                  ? 'border-l-2 border-l-[#101310] dark:border-l-[#F7F8F4]'
+                                  : '',
+                                cluster.rightEdge
+                                  ? 'border-r-2 border-r-[#101310] dark:border-r-[#F7F8F4]'
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')
+                            : '';
 
                           return (
                             <td
@@ -1430,7 +1794,7 @@ export default function Dashboard({
                                 e.preventDefault();
                                 handleDropOnCell(courtNum, time);
                               }}
-                              className="p-0 border-r border-black/10 dark:border-white/10 last:border-r-0"
+                              className={`relative p-0 ${cellGridBorders}`}
                             >
                               <button
                                 type="button"
@@ -1467,16 +1831,16 @@ export default function Dashboard({
                                       : 'Click to select slot'
                                     : 'Available (click "Book Court" to book)'
                                 }
-                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors ${
+                                className={`relative flex h-8 w-full items-center justify-center overflow-visible text-[11px] font-black transition-colors ${bookingPerimeterClasses} ${
                                   isBooked
                                     ? isBeingDragged
-                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 ring-2 ring-inset ring-black dark:ring-white cursor-grabbing'
+                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 cursor-grabbing'
                                       : isDragOverTarget
-                                      ? 'bg-amber-400 text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
+                                      ? 'bg-amber-400 text-[#101310]'
                                       : isSwapMode
                                       ? 'bg-red-500 text-white hover:bg-red-600 cursor-grab active:cursor-grabbing'
                                       : isBookedSelected
-                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black dark:ring-white cursor-pointer'
+                                      ? 'bg-red-700 text-white cursor-pointer'
                                       : 'bg-red-500 text-white hover:bg-red-600 cursor-pointer'
                                     : isDragOverTarget
                                     ? 'bg-[#d8ff3e] text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
@@ -1489,12 +1853,28 @@ export default function Dashboard({
                                     : 'bg-white dark:bg-[#16171A] cursor-default'
                                 }`}
                               >
-                                {isSwapMode && isBooked ? (
-                                  <GripVertical size={12} className="opacity-80" />
+                                {/* Centered Booker Name / Walk-in across the merged booking block */}
+                                {isBooked && cluster?.showLabel && !isDragOverTarget && (
+                                  <span
+                                    style={{
+                                      transform: `translate(${cluster.offsetXPercent}%, ${cluster.offsetYPercent}%)`,
+                                    }}
+                                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-1 text-center text-[11px] font-black leading-none tracking-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)] whitespace-nowrap"
+                                  >
+                                    {cluster.label}
+                                  </span>
+                                )}
+
+                                {isSwapMode && isBooked && !cluster?.showLabel ? (
+                                  <GripVertical size={12} className="opacity-70" />
                                 ) : isDragOverTarget ? (
                                   '⇄'
+                                ) : isBookedSelected ? (
+                                  <span className="absolute right-1 top-0.5 text-[9px] font-black text-[#d8ff3e]">
+                                    ✓
+                                  </span>
                                 ) : (
-                                  (isBookedSelected || isOpenSelected) && '✓'
+                                  isOpenSelected && '✓'
                                 )}
                               </button>
                             </td>
@@ -1708,7 +2088,7 @@ export default function Dashboard({
                   )}
                 </div>
 
-                {/* Sport Filter Buttons */}
+                {/* Sport Filter Buttons (Persists across Current/Active and Past tabs) */}
                 <div className="flex flex-wrap items-center gap-1.5">
                   <span className="mr-1 text-[11px] font-bold text-black/50 dark:text-[#F7F8F4]/50">
                     Sport:
@@ -1728,23 +2108,29 @@ export default function Dashboard({
                     All ({baseTabBookings.length})
                   </button>
 
-                  {availableMasterSports.map((sport) => (
-                    <button
-                      key={sport}
-                      type="button"
-                      onClick={() => {
-                        setMasterSportFilter(sport);
-                        setMasterVisibleCount(10);
-                      }}
-                      className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
-                        masterSportFilter === sport
-                          ? 'border-[#81971d] dark:border-[#d8ff3e] bg-[#81971d] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
-                          : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
-                      }`}
-                    >
-                      {sport}
-                    </button>
-                  ))}
+                  {availableMasterSports.map((sport) => {
+                    const countInTab = baseTabBookings.filter(
+                      (b) => String(b.sport || '').trim().toUpperCase() === sport
+                    ).length;
+
+                    return (
+                      <button
+                        key={sport}
+                        type="button"
+                        onClick={() => {
+                          setMasterSportFilter(sport);
+                          setMasterVisibleCount(10);
+                        }}
+                        className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
+                          masterSportFilter === sport
+                            ? 'border-[#81971d] dark:border-[#d8ff3e] bg-[#81971d] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
+                            : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
+                        }`}
+                      >
+                        {sport} ({countInTab})
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
