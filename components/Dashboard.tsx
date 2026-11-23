@@ -528,7 +528,7 @@ export default function Dashboard({
     return map;
   }, [venueBookings, selectedDate, selectedMatrixSport, totalCourts]);
 
-  // Group contiguous booked cells by booker to compute outer perimeter borders & centered label placement
+  // Group contiguous booked cells by booker to compute outer perimeter borders & maximum-clearance label placement
   const bookingClusterMeta = useMemo(() => {
     const meta: Record<string, ClusterCellVisual> = {};
     const visited = new Set<string>();
@@ -577,27 +577,86 @@ export default function Dashboard({
           }
         }
 
-        // Geometric centroid of the contiguous cluster in cell coordinates
+        const memberSet = new Set(component.map((item) => `${item.r}:${item.c}`));
+
+        // Geometric centroid used only as a tie-breaker among equally safe interior points
         const sumR = component.reduce((acc, item) => acc + item.r, 0);
         const sumC = component.reduce((acc, item) => acc + item.c, 0);
         const centerR = sumR / component.length;
         const centerC = sumC / component.length;
 
-        // Anchor the centered label inside the cell closest to the centroid
-        let anchor = component[0];
-        let bestDist = Infinity;
+        // Generate candidate label centers: cell centers (0.0) and shared internal edges (+0.5)
+        const candidates: { posR: number; posC: number }[] = [];
         for (const item of component) {
-          const dist =
-            Math.pow(item.r - centerR, 2) + Math.pow(item.c - centerC, 2);
-          if (dist < bestDist) {
-            bestDist = dist;
-            anchor = item;
+          candidates.push({ posR: item.r, posC: item.c });
+          const hasRight = memberSet.has(`${item.r}:${item.c + 1}`);
+          const hasDown = memberSet.has(`${item.r + 1}:${item.c}`);
+          const hasDiag = memberSet.has(`${item.r + 1}:${item.c + 1}`);
+
+          if (hasRight) {
+            candidates.push({ posR: item.r, posC: item.c + 0.5 });
+          }
+          if (hasDown) {
+            candidates.push({ posR: item.r + 0.5, posC: item.c });
+          }
+          if (hasRight && hasDown && hasDiag) {
+            candidates.push({ posR: item.r + 0.5, posC: item.c + 0.5 });
           }
         }
 
+        // Compute distance from any candidate (posR, posC) to the nearest outer boundary of the cluster
+        // Note: rows are ~32px tall while columns are ~110px wide, so weight vertical clearance higher
+        const getBoundaryClearance = (posR: number, posC: number): number => {
+          let minClearance = Infinity;
+          const minR = Math.min(...component.map((x) => x.r)) - 1;
+          const maxR = Math.max(...component.map((x) => x.r)) + 1;
+          const minC = Math.min(...component.map((x) => x.c)) - 1;
+          const maxC = Math.max(...component.map((x) => x.c)) + 1;
+
+          for (let rr = minR; rr <= maxR; rr++) {
+            for (let cc = minC; cc <= maxC; cc++) {
+              if (memberSet.has(`${rr}:${cc}`)) continue;
+              // Distance from (posR, posC) to the unit square [rr - 0.5, rr + 0.5] x [cc - 0.5, cc + 0.5]
+              const dR = Math.max(0, Math.abs(posR - rr) - 0.5);
+              const dC = Math.max(0, Math.abs(posC - cc) - 0.5);
+              // Weight vertical clearance (1.0) vs horizontal clearance (2.2) to match cell aspect ratio
+              const weightedDist = Math.hypot(dR * 1.0, dC * 2.2);
+              if (weightedDist < minClearance) {
+                minClearance = weightedDist;
+              }
+            }
+          }
+          return minClearance;
+        };
+
+        // Pick the candidate with maximum clearance from all borders (pole of inaccessibility)
+        let bestPos = { posR: component[0].r, posC: component[0].c };
+        let bestScore = -Infinity;
+
+        for (const cand of candidates) {
+          const clearance = getBoundaryClearance(cand.posR, cand.posC);
+          const distToCentroid = Math.hypot(
+            cand.posR - centerR,
+            cand.posC - centerC
+          );
+          // Primary priority: max clearance from edges; tiny tie-breaker: closer to centroid
+          const score = clearance * 100 - distToCentroid;
+          if (score > bestScore) {
+            bestScore = score;
+            bestPos = cand;
+          }
+        }
+
+        // Anchor to the member cell whose top-left/center owns bestPos (floor handles .5 cleanly)
+        const anchorR = Math.floor(bestPos.posR);
+        const anchorC = Math.floor(bestPos.posC);
+        const anchor =
+          component.find((item) => item.r === anchorR && item.c === anchorC) ||
+          component[0];
+
         const label = getMatrixBookerLabel(startBooking);
-        const offsetXPercent = (centerC - anchor.c) * 100;
-        const offsetYPercent = (centerR - anchor.r) * 100;
+        const offsetXPercent = (bestPos.posC - anchor.c) * 100;
+        const offsetYPercent = (bestPos.posR - anchor.r) * 100;
 
         for (const item of component) {
           meta[item.key] = {
