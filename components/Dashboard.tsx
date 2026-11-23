@@ -21,6 +21,9 @@ import {
   X,
   ArrowRightLeft,
   GripVertical,
+  Search,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { partnerService } from '@/lib/services/partnerService';
@@ -62,6 +65,51 @@ const toFullSlotLabel = (startHourStr: string) => {
   const hr = parseInt(startHourStr.split(':')[0], 10);
   const nextHr = (hr + 1) % 24;
   return `${String(hr).padStart(2, '0')}:00 - ${String(nextHr).padStart(2, '0')}:00`;
+};
+
+// Determine if a booking is in the past based on current date and slot end time
+const isBookingInPast = (booking: DashboardBooking, now: Date) => {
+  if (!booking.date) return false;
+  const parts = booking.date.split('-').map(Number);
+  if (parts.length !== 3 || parts.some(isNaN)) return false;
+
+  const [year, month, day] = parts;
+  const rawTime = String(booking.time || '');
+
+  // Match "13:00 - 14:00" (or single time "13:00")
+  const rangeMatch = rawTime.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
+  const singleMatch = rawTime.match(/(\d{1,2}):(\d{2})/);
+
+  let endHour = 23;
+  let endMinute = 59;
+  let isNextDayMidnight = false;
+
+  if (rangeMatch) {
+    const startH = parseInt(rangeMatch[1], 10);
+    endHour = parseInt(rangeMatch[3], 10);
+    endMinute = parseInt(rangeMatch[4], 10);
+    if (endHour === 0 && endMinute === 0 && startH > 0) {
+      isNextDayMidnight = true;
+    }
+  } else if (singleMatch) {
+    endHour = parseInt(singleMatch[1], 10) + 1;
+    endMinute = parseInt(singleMatch[2], 10);
+    if (endHour >= 24) {
+      endHour = 0;
+      isNextDayMidnight = true;
+    }
+  }
+
+  const endDateTime = new Date(
+    year,
+    month - 1,
+    day + (isNextDayMidnight ? 1 : 0),
+    endHour,
+    endMinute,
+    0
+  );
+
+  return endDateTime.getTime() < now.getTime();
 };
 
 const UUID_REGEX =
@@ -113,6 +161,14 @@ export default function Dashboard({
   >([]);
   const [targetMoveCourt, setTargetMoveCourt] = useState<number>(1);
   const [isProcessingBookedAction, setIsProcessingBookedAction] = useState(false);
+
+  // Master Reservation List Controls
+  const [masterTimeTab, setMasterTimeTab] = useState<'active' | 'past'>('active');
+  const [masterSearchQuery, setMasterSearchQuery] = useState<string>('');
+  const [masterSportFilter, setMasterSportFilter] = useState<string>('ALL');
+  const [masterVisibleCount, setMasterVisibleCount] = useState<number>(10);
+  const [masterViewMode, setMasterViewMode] = useState<'list' | 'grid'>('list');
+  const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
 
   // Live venue bookings mapped from Supabase `bookings` columns
   const [venueBookings, setVenueBookings] = useState<DashboardBooking[]>(
@@ -225,6 +281,7 @@ export default function Dashboard({
   useEffect(() => {
     let currentDay = getLocalTodayStr();
     const interval = setInterval(() => {
+      setCurrentTime(new Date());
       const latestDay = getLocalTodayStr();
       if (latestDay !== currentDay) {
         setSelectedDate((prev) => (prev === currentDay ? latestDay : prev));
@@ -376,6 +433,67 @@ export default function Dashboard({
       occupancyRate,
     };
   }, [venueBookings, ownedVenues, totalCourts, activeHours, bookedCellMap]);
+
+  // Master Reservation List: Split into Current/Active vs Past, then filter by Booking ID & Sport
+  const { activeTimeBookings, pastTimeBookings } = useMemo(() => {
+    const activeList: DashboardBooking[] = [];
+    const pastList: DashboardBooking[] = [];
+
+    venueBookings.forEach((b) => {
+      if (isBookingInPast(b, currentTime)) {
+        pastList.push(b);
+      } else {
+        activeList.push(b);
+      }
+    });
+
+    return { activeTimeBookings: activeList, pastTimeBookings: pastList };
+  }, [venueBookings, currentTime]);
+
+  const baseTabBookings =
+    masterTimeTab === 'active' ? activeTimeBookings : pastTimeBookings;
+
+  const availableMasterSports = useMemo(() => {
+    return Array.from(
+      new Set(
+        baseTabBookings
+          .map((b) => String(b.sport || '').trim().toUpperCase())
+          .filter(Boolean)
+      )
+    );
+  }, [baseTabBookings]);
+
+  useEffect(() => {
+    if (
+      masterSportFilter !== 'ALL' &&
+      !availableMasterSports.includes(masterSportFilter)
+    ) {
+      setMasterSportFilter('ALL');
+    }
+  }, [availableMasterSports, masterSportFilter]);
+
+  const filteredMasterBookings = useMemo(() => {
+    const query = masterSearchQuery.trim().toLowerCase();
+
+    return baseTabBookings.filter((b) => {
+      const bookingCode = String(b.id || '').toLowerCase();
+      const matchesSearch = !query || bookingCode.includes(query);
+      // Future enhancement: also match customerName / customerEmail here
+
+      const sportUpper = String(b.sport || '').trim().toUpperCase();
+      const matchesSport =
+        masterSportFilter === 'ALL' || sportUpper === masterSportFilter;
+
+      return matchesSearch && matchesSport;
+    });
+  }, [baseTabBookings, masterSearchQuery, masterSportFilter]);
+
+  const visibleMasterBookings = useMemo(() => {
+    return filteredMasterBookings.slice(0, masterVisibleCount);
+  }, [filteredMasterBookings, masterVisibleCount]);
+
+  const hasMoreMasterBookings =
+    masterVisibleCount < filteredMasterBookings.length;
 
   const resetSwapMode = () => {
     setIsSwapMode(false);
@@ -827,6 +945,7 @@ export default function Dashboard({
                 setSelectedSlots([]);
                 setSelectedBookedCells([]);
                 resetSwapMode();
+                setMasterVisibleCount(10);
               }}
               className="rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
             >
@@ -1481,20 +1600,171 @@ export default function Dashboard({
 
             {/* VENUE MASTER RESERVATION LIST */}
             <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
-              <h2 className="text-2xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
-                Master Reservation List
-              </h2>
-              <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
-                Showing active player bookings for{' '}
-                {selectedVenue?.name || 'your venue'}.
-              </p>
+              {/* Header + Current/Past Flip Button + List/Grid Toggle */}
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
+                    Master Reservation List
+                  </h2>
+                  <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
+                    Showing {masterTimeTab === 'active' ? 'current & upcoming' : 'past'}{' '}
+                    player bookings for {selectedVenue?.name || 'your venue'}.
+                  </p>
+                </div>
 
-              <div className="mt-6 divide-y divide-black/10 dark:divide-white/10 rounded-2xl border border-black/10 dark:border-white/10">
-                {venueBookings.length > 0 ? (
-                  venueBookings.map((b) => (
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {/* Current / Active vs Past Bookings Flip Toggle */}
+                  <div className="inline-flex items-center rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMasterTimeTab('active');
+                        setMasterVisibleCount(10);
+                      }}
+                      className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                        masterTimeTab === 'active'
+                          ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+                          : 'text-black/60 dark:text-[#F7F8F4]/70 hover:text-black dark:hover:text-[#F7F8F4]'
+                      }`}
+                    >
+                      Current / Active ({activeTimeBookings.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMasterTimeTab('past');
+                        setMasterVisibleCount(10);
+                      }}
+                      className={`rounded-xl px-3.5 py-1.5 text-xs font-black transition ${
+                        masterTimeTab === 'past'
+                          ? 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310] shadow-sm'
+                          : 'text-black/60 dark:text-[#F7F8F4]/70 hover:text-black dark:hover:text-[#F7F8F4]'
+                      }`}
+                    >
+                      Past ({pastTimeBookings.length})
+                    </button>
+                  </div>
+
+                  {/* List vs Grid View Toggle */}
+                  <div className="inline-flex items-center rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-1">
+                    <button
+                      type="button"
+                      onClick={() => setMasterViewMode('list')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        masterViewMode === 'list'
+                          ? 'bg-white dark:bg-[#16171A] text-[#101310] dark:text-[#F7F8F4] shadow-sm'
+                          : 'text-black/55 dark:text-[#F7F8F4]/60 hover:text-black dark:hover:text-[#F7F8F4]'
+                      }`}
+                    >
+                      <List size={14} />
+                      List
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMasterViewMode('grid')}
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition ${
+                        masterViewMode === 'grid'
+                          ? 'bg-white dark:bg-[#16171A] text-[#101310] dark:text-[#F7F8F4] shadow-sm'
+                          : 'text-black/55 dark:text-[#F7F8F4]/60 hover:text-black dark:hover:text-[#F7F8F4]'
+                      }`}
+                    >
+                      <LayoutGrid size={14} />
+                      Grid
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Search by Booking ID + Sport Filter Buttons */}
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                {/* Booking ID Search Input */}
+                <div className="relative flex-1 max-w-md">
+                  <Search
+                    size={15}
+                    className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-black/40 dark:text-[#F7F8F4]/45"
+                  />
+                  <input
+                    type="text"
+                    value={masterSearchQuery}
+                    onChange={(e) => {
+                      setMasterSearchQuery(e.target.value);
+                      setMasterVisibleCount(10);
+                    }}
+                    placeholder="Search by Booking ID (e.g. BK-A03C5A)..."
+                    className="w-full rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] py-2 pl-9 pr-8 text-xs font-semibold text-[#101310] dark:text-[#F7F8F4] placeholder:text-black/40 dark:placeholder:text-[#F7F8F4]/40 outline-none focus:border-[#81971d] dark:focus:border-[#d8ff3e]"
+                  />
+                  {masterSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMasterSearchQuery('');
+                        setMasterVisibleCount(10);
+                      }}
+                      aria-label="Clear booking ID search"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-black/45 dark:text-[#F7F8F4]/50 hover:text-black dark:hover:text-[#F7F8F4]"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* Sport Filter Buttons */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="mr-1 text-[11px] font-bold text-black/50 dark:text-[#F7F8F4]/50">
+                    Sport:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMasterSportFilter('ALL');
+                      setMasterVisibleCount(10);
+                    }}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
+                      masterSportFilter === 'ALL'
+                        ? 'border-[#101310] dark:border-[#d8ff3e] bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310]'
+                        : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
+                    }`}
+                  >
+                    All ({baseTabBookings.length})
+                  </button>
+
+                  {availableMasterSports.map((sport) => (
+                    <button
+                      key={sport}
+                      type="button"
+                      onClick={() => {
+                        setMasterSportFilter(sport);
+                        setMasterVisibleCount(10);
+                      }}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-black transition ${
+                        masterSportFilter === sport
+                          ? 'border-[#81971d] dark:border-[#d8ff3e] bg-[#81971d] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
+                          : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/65 dark:text-[#F7F8F4]/75 hover:border-black/30 dark:hover:border-white/25'
+                      }`}
+                    >
+                      {sport}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bookings List / Grid */}
+              {visibleMasterBookings.length > 0 ? (
+                <div
+                  className={
+                    masterViewMode === 'grid'
+                      ? 'mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                      : 'mt-6 divide-y divide-black/10 dark:divide-white/10 rounded-2xl border border-black/10 dark:border-white/10'
+                  }
+                >
+                  {visibleMasterBookings.map((b) => (
                     <div
-                      key={b.id}
-                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center justify-between"
+                      key={b.dbId || b.id}
+                      className={
+                        masterViewMode === 'grid'
+                          ? 'flex flex-col justify-between gap-4 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4]/60 dark:bg-[#0B0B0C]/60 p-4 transition hover:border-black/25 dark:hover:border-white/25'
+                          : 'flex flex-col gap-3 p-4 sm:flex-row sm:items-center justify-between'
+                      }
                     >
                       <div>
                         <span className="text-[10px] font-black uppercase text-[#81971d] dark:text-[#d8ff3e]">
@@ -1508,12 +1778,18 @@ export default function Dashboard({
                             </span>
                           )}
                         </p>
-                        <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60">
+                        <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60 mt-0.5">
                           {b.date} · {b.time}
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div
+                        className={
+                          masterViewMode === 'grid'
+                            ? 'flex items-center justify-between border-t border-black/10 dark:border-white/10 pt-3'
+                            : 'flex items-center gap-3'
+                        }
+                      >
                         <span
                           className={`rounded-full px-3 py-1 text-[10px] font-black ${
                             b.status === 'Cancelled'
@@ -1523,24 +1799,50 @@ export default function Dashboard({
                         >
                           {b.status}
                         </span>
-                        <b className="text-sm text-[#101310] dark:text-[#F7F8F4]">{money(b.price)}</b>
-                        {b.status === 'Confirmed' && (
-                          <button
-                            onClick={() => handleCancelReservation(b)}
-                            className="text-xs font-bold text-red-600 dark:text-red-400 underline hover:text-red-800 dark:hover:text-red-300 transition"
-                          >
-                            Cancel
-                          </button>
-                        )}
+
+                        <div className="flex items-center gap-3">
+                          <b className="text-sm text-[#101310] dark:text-[#F7F8F4]">
+                            {money(b.price)}
+                          </b>
+                          {b.status === 'Confirmed' && masterTimeTab === 'active' && (
+                            <button
+                              onClick={() => handleCancelReservation(b)}
+                              className="text-xs font-bold text-red-600 dark:text-red-400 underline hover:text-red-800 dark:hover:text-red-300 transition"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ))
-                ) : (
-                  <div className="p-8 text-center text-xs font-bold text-black/45 dark:text-[#F7F8F4]/50">
-                    No active reservations found for this view.
-                  </div>
-                )}
-              </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-black/10 dark:border-white/10 p-8 text-center text-xs font-bold text-black/45 dark:text-[#F7F8F4]/50">
+                  No {masterTimeTab === 'active' ? 'current or active' : 'past'}{' '}
+                  reservations found matching your filters.
+                </div>
+              )}
+
+              {/* Pagination Count & Load More Button */}
+              {filteredMasterBookings.length > 0 && (
+                <div className="mt-6 flex flex-col items-center gap-2.5">
+                  <p className="text-xs font-semibold text-black/50 dark:text-[#F7F8F4]/55">
+                    Showing {visibleMasterBookings.length} of{' '}
+                    {filteredMasterBookings.length} bookings
+                  </p>
+
+                  {hasMoreMasterBookings && (
+                    <button
+                      type="button"
+                      onClick={() => setMasterVisibleCount((prev) => prev + 10)}
+                      className="rounded-xl border border-black/15 dark:border-white/15 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-5 py-2 text-xs font-black text-[#101310] dark:text-[#F7F8F4] transition hover:border-black/35 dark:hover:border-white/30 hover:bg-[#eef7cf] dark:hover:bg-white/10"
+                    >
+                      Load More
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </>
         ) : (
