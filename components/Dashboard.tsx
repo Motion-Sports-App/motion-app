@@ -46,6 +46,17 @@ type SelectedBookedCell = {
   booking: DashboardBooking;
 };
 
+type ClusterCellVisual = {
+  topEdge: boolean;
+  bottomEdge: boolean;
+  leftEdge: boolean;
+  rightEdge: boolean;
+  showLabel: boolean;
+  label: string;
+  offsetXPercent: number;
+  offsetYPercent: number;
+};
+
 const DEFAULT_HOURS = [
   '00:00', '01:00', '02:00', '03:00', '04:00', '05:00', '06:00',
   '07:00', '08:00', '09:00', '10:00', '11:00', '12:00', '13:00',
@@ -102,6 +113,39 @@ const extractVenueSports = (venue: Venue | null): string[] => {
   });
 
   return Array.from(uniqueMap.values());
+};
+
+// Clean display label for the matrix block ("ming", "amy", "tonnam", or "Walk-in")
+const getMatrixBookerLabel = (booking: DashboardBooking): string => {
+  const rawName = String(booking.customerName || '').trim();
+  if (rawName) {
+    // Strip "(Front Desk)" suffix
+    const cleaned = rawName.replace(/\s*\(front\s*desk\)\s*$/i, '').trim();
+    if (!cleaned || /^walk[-\s]?in(\s+player)?$/i.test(cleaned)) {
+      return 'Walk-in';
+    }
+    return cleaned;
+  }
+
+  const rawEmail = String(booking.customerEmail || '').trim();
+  if (rawEmail && !rawEmail.toLowerCase().startsWith('frontdesk@')) {
+    return rawEmail.split('@')[0];
+  }
+
+  return 'Walk-in';
+};
+
+// Stable identity key for grouping adjacent bookings by the same person
+const getBookerIdentityKey = (booking: DashboardBooking): string => {
+  const label = getMatrixBookerLabel(booking).toLowerCase();
+  if (label === 'walk-in') {
+    // Keep separate walk-in bookings distinct unless they belong to the same multi-court/multi-hour booking record
+    return `walkin:${booking.dbId || booking.id}`;
+  }
+  if (booking.userId) {
+    return `user:${booking.userId}`;
+  }
+  return `name:${label}`;
 };
 
 // Determine if a booking is in the past based on current date and slot end time
@@ -427,8 +471,26 @@ export default function Dashboard({
 
     activeOnDate.forEach((b) => {
       const rawTime = String(b.time || '');
-      const timeMatch = rawTime.match(/\d{2}:\d{2}/);
-      const slotTime = timeMatch ? timeMatch[0] : rawTime;
+      const rangeMatch = rawTime.match(/(\d{2}):\d{2}\s*[-–]\s*(\d{2}):\d{2}/);
+      const singleMatch = rawTime.match(/(\d{2}):\d{2}/);
+
+      let slotTimes: string[] = [];
+      if (rangeMatch) {
+        const startHr = parseInt(rangeMatch[1], 10);
+        const rawEndHr = parseInt(rangeMatch[2], 10);
+        const endHr = rawEndHr === 0 && startHr > 0 ? 24 : rawEndHr;
+        if (endHr > startHr) {
+          for (let h = startHr; h < endHr; h++) {
+            slotTimes.push(`${String(h).padStart(2, '0')}:00`);
+          }
+        } else {
+          slotTimes = [`${String(startHr).padStart(2, '0')}:00`];
+        }
+      } else if (singleMatch) {
+        slotTimes = [singleMatch[0]];
+      } else {
+        slotTimes = [rawTime];
+      }
 
       // Support both "Court 2" and "Courts 1, 2"
       const courtListMatch = rawTime.match(/Courts?\s*([\d,\s]+)/i);
@@ -439,30 +501,121 @@ export default function Dashboard({
             .filter((n) => !isNaN(n) && n >= 1 && n <= totalCourts)
         : [];
 
-      if (explicitCourts.length > 0) {
-        explicitCourts.forEach((c) => {
-          map[`C${c}_${slotTime}`] = b;
-        });
-      } else {
-        const qty = Math.max(1, Number(b.courtCount || 1));
-        for (let q = 0; q < qty; q++) {
-          let assignedCourt = (fallbackUsedByTime[slotTime] || 0) + 1;
-          while (
-            map[`C${assignedCourt}_${slotTime}`] &&
-            assignedCourt <= totalCourts
-          ) {
-            assignedCourt++;
-          }
-          if (assignedCourt <= totalCourts) {
-            fallbackUsedByTime[slotTime] = assignedCourt;
-            map[`C${assignedCourt}_${slotTime}`] = b;
+      slotTimes.forEach((slotTime) => {
+        if (explicitCourts.length > 0) {
+          explicitCourts.forEach((c) => {
+            map[`C${c}_${slotTime}`] = b;
+          });
+        } else {
+          const qty = Math.max(1, Number(b.courtCount || 1));
+          for (let q = 0; q < qty; q++) {
+            let assignedCourt = (fallbackUsedByTime[slotTime] || 0) + 1;
+            while (
+              map[`C${assignedCourt}_${slotTime}`] &&
+              assignedCourt <= totalCourts
+            ) {
+              assignedCourt++;
+            }
+            if (assignedCourt <= totalCourts) {
+              fallbackUsedByTime[slotTime] = assignedCourt;
+              map[`C${assignedCourt}_${slotTime}`] = b;
+            }
           }
         }
-      }
+      });
     });
 
     return map;
   }, [venueBookings, selectedDate, selectedMatrixSport, totalCourts]);
+
+  // Group contiguous booked cells by booker to compute outer perimeter borders & centered label placement
+  const bookingClusterMeta = useMemo(() => {
+    const meta: Record<string, ClusterCellVisual> = {};
+    const visited = new Set<string>();
+    const rowCount = activeHours.length;
+
+    const getIdentityAt = (r: number, c: number): string | null => {
+      if (r < 0 || r >= rowCount || c < 1 || c > totalCourts) return null;
+      const b = bookedCellMap[`C${c}_${activeHours[r]}`];
+      return b ? getBookerIdentityKey(b) : null;
+    };
+
+    for (let r = 0; r < rowCount; r++) {
+      for (let c = 1; c <= totalCourts; c++) {
+        const startKey = `C${c}_${activeHours[r]}`;
+        const startBooking = bookedCellMap[startKey];
+        if (!startBooking || visited.has(startKey)) continue;
+
+        const identity = getBookerIdentityKey(startBooking);
+        const component: { r: number; c: number; key: string }[] = [];
+        const queue: { r: number; c: number }[] = [{ r, c }];
+        visited.add(startKey);
+
+        while (queue.length > 0) {
+          const curr = queue.shift()!;
+          const currKey = `C${curr.c}_${activeHours[curr.r]}`;
+          component.push({ r: curr.r, c: curr.c, key: currKey });
+
+          const neighbors = [
+            { r: curr.r - 1, c: curr.c },
+            { r: curr.r + 1, c: curr.c },
+            { r: curr.r, c: curr.c - 1 },
+            { r: curr.r, c: curr.c + 1 },
+          ];
+
+          for (const nb of neighbors) {
+            if (nb.r < 0 || nb.r >= rowCount || nb.c < 1 || nb.c > totalCourts) {
+              continue;
+            }
+            const nbKey = `C${nb.c}_${activeHours[nb.r]}`;
+            if (visited.has(nbKey)) continue;
+            const nbBooking = bookedCellMap[nbKey];
+            if (nbBooking && getBookerIdentityKey(nbBooking) === identity) {
+              visited.add(nbKey);
+              queue.push(nb);
+            }
+          }
+        }
+
+        // Geometric centroid of the contiguous cluster in cell coordinates
+        const sumR = component.reduce((acc, item) => acc + item.r, 0);
+        const sumC = component.reduce((acc, item) => acc + item.c, 0);
+        const centerR = sumR / component.length;
+        const centerC = sumC / component.length;
+
+        // Anchor the centered label inside the cell closest to the centroid
+        let anchor = component[0];
+        let bestDist = Infinity;
+        for (const item of component) {
+          const dist =
+            Math.pow(item.r - centerR, 2) + Math.pow(item.c - centerC, 2);
+          if (dist < bestDist) {
+            bestDist = dist;
+            anchor = item;
+          }
+        }
+
+        const label = getMatrixBookerLabel(startBooking);
+        const offsetXPercent = (centerC - anchor.c) * 100;
+        const offsetYPercent = (centerR - anchor.r) * 100;
+
+        for (const item of component) {
+          meta[item.key] = {
+            topEdge: getIdentityAt(item.r - 1, item.c) !== identity,
+            bottomEdge: getIdentityAt(item.r + 1, item.c) !== identity,
+            leftEdge: getIdentityAt(item.r, item.c - 1) !== identity,
+            rightEdge: getIdentityAt(item.r, item.c + 1) !== identity,
+            showLabel: item.key === anchor.key,
+            label,
+            offsetXPercent: item.key === anchor.key ? offsetXPercent : 0,
+            offsetYPercent: item.key === anchor.key ? offsetYPercent : 0,
+          };
+        }
+      }
+    }
+
+    return meta;
+  }, [bookedCellMap, activeHours, totalCourts]);
 
   // Determine which courts are conflict-free across all currently selected booked slots
   const validMoveCourts = useMemo(() => {
@@ -1474,7 +1627,7 @@ export default function Dashboard({
 
               {/* MATRIX TABLE */}
               <div className="mt-4 overflow-x-auto rounded-xl border border-black/15 dark:border-white/10">
-                <table className="w-full text-left border-collapse min-w-[600px]">
+                <table className="w-full table-fixed text-left border-collapse min-w-[600px]">
                   <thead>
                     <tr className="bg-[#101310] text-white text-[11px] font-black uppercase">
                       <th className="px-3 py-2 border-r border-white/10 w-24">
@@ -1490,10 +1643,16 @@ export default function Dashboard({
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-black/10 dark:divide-white/10 text-xs">
-                    {activeHours.map((time) => (
+                  <tbody className="text-xs">
+                    {activeHours.map((time, rowIdx) => (
                       <tr key={time}>
-                        <td className="px-3 py-1 font-extrabold bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border-r border-black/10 dark:border-white/10">
+                        <td
+                          className={`px-3 py-1 font-extrabold bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] border-r border-black/10 dark:border-white/10 ${
+                            rowIdx > 0
+                              ? 'border-t border-black/10 dark:border-white/10'
+                              : ''
+                          }`}
+                        >
                           {time}
                         </td>
                         {Array.from({ length: totalCourts }).map((_, i) => {
@@ -1501,6 +1660,10 @@ export default function Dashboard({
                           const cellKey = `C${courtNum}_${time}`;
                           const booking = bookedCellMap[cellKey];
                           const isBooked = Boolean(booking);
+                          const cluster = isBooked
+                            ? bookingClusterMeta[cellKey]
+                            : undefined;
+
                           const isBookedSelected = selectedBookedCells.some(
                             (c) => c.key === cellKey
                           );
@@ -1515,10 +1678,42 @@ export default function Dashboard({
                           const isOpenSelected = selectedSlots.some(
                             (s) => s.court === courtNum && s.time === time
                           );
-                          const guestName =
-                            booking?.customerName ||
-                            booking?.customerEmail ||
-                            'Walk-in';
+                          const guestName = booking
+                            ? getMatrixBookerLabel(booking)
+                            : 'Walk-in';
+
+                          // Draw light internal grid lines only when not inside a merged booking cluster
+                          const cellGridBorders = [
+                            rowIdx > 0 && (!cluster || cluster.topEdge)
+                              ? 'border-t border-black/10 dark:border-white/10'
+                              : '',
+                            i < totalCourts - 1 &&
+                            (!cluster || cluster.rightEdge)
+                              ? 'border-r border-black/10 dark:border-white/10'
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .join(' ');
+
+                          // Draw crisp 2px black perimeter around each contiguous booking block
+                          const bookingPerimeterClasses = cluster
+                            ? [
+                                cluster.topEdge
+                                  ? 'border-t-2 border-t-[#101310] dark:border-t-[#F7F8F4]'
+                                  : '',
+                                cluster.bottomEdge
+                                  ? 'border-b-2 border-b-[#101310] dark:border-b-[#F7F8F4]'
+                                  : '',
+                                cluster.leftEdge
+                                  ? 'border-l-2 border-l-[#101310] dark:border-l-[#F7F8F4]'
+                                  : '',
+                                cluster.rightEdge
+                                  ? 'border-r-2 border-r-[#101310] dark:border-r-[#F7F8F4]'
+                                  : '',
+                              ]
+                                .filter(Boolean)
+                                .join(' ')
+                            : '';
 
                           return (
                             <td
@@ -1540,7 +1735,7 @@ export default function Dashboard({
                                 e.preventDefault();
                                 handleDropOnCell(courtNum, time);
                               }}
-                              className="p-0 border-r border-black/10 dark:border-white/10 last:border-r-0"
+                              className={`relative p-0 ${cellGridBorders}`}
                             >
                               <button
                                 type="button"
@@ -1577,16 +1772,16 @@ export default function Dashboard({
                                       : 'Click to select slot'
                                     : 'Available (click "Book Court" to book)'
                                 }
-                                className={`flex h-7 w-full items-center justify-center text-[10px] font-black transition-colors ${
+                                className={`relative flex h-8 w-full items-center justify-center overflow-visible text-[11px] font-black transition-colors ${bookingPerimeterClasses} ${
                                   isBooked
                                     ? isBeingDragged
-                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 ring-2 ring-inset ring-black dark:ring-white cursor-grabbing'
+                                      ? 'bg-red-800 text-[#d8ff3e] opacity-60 cursor-grabbing'
                                       : isDragOverTarget
-                                      ? 'bg-amber-400 text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
+                                      ? 'bg-amber-400 text-[#101310]'
                                       : isSwapMode
                                       ? 'bg-red-500 text-white hover:bg-red-600 cursor-grab active:cursor-grabbing'
                                       : isBookedSelected
-                                      ? 'bg-red-700 text-white ring-2 ring-inset ring-black dark:ring-white cursor-pointer'
+                                      ? 'bg-red-700 text-white cursor-pointer'
                                       : 'bg-red-500 text-white hover:bg-red-600 cursor-pointer'
                                     : isDragOverTarget
                                     ? 'bg-[#d8ff3e] text-[#101310] ring-2 ring-inset ring-black dark:ring-white'
@@ -1599,12 +1794,28 @@ export default function Dashboard({
                                     : 'bg-white dark:bg-[#16171A] cursor-default'
                                 }`}
                               >
-                                {isSwapMode && isBooked ? (
-                                  <GripVertical size={12} className="opacity-80" />
+                                {/* Centered Booker Name / Walk-in across the merged booking block */}
+                                {isBooked && cluster?.showLabel && !isDragOverTarget && (
+                                  <span
+                                    style={{
+                                      transform: `translate(${cluster.offsetXPercent}%, ${cluster.offsetYPercent}%)`,
+                                    }}
+                                    className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center px-1 text-center text-[11px] font-black leading-none tracking-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.45)] whitespace-nowrap"
+                                  >
+                                    {cluster.label}
+                                  </span>
+                                )}
+
+                                {isSwapMode && isBooked && !cluster?.showLabel ? (
+                                  <GripVertical size={12} className="opacity-70" />
                                 ) : isDragOverTarget ? (
                                   '⇄'
+                                ) : isBookedSelected ? (
+                                  <span className="absolute right-1 top-0.5 text-[9px] font-black text-[#d8ff3e]">
+                                    ✓
+                                  </span>
                                 ) : (
-                                  (isBookedSelected || isOpenSelected) && '✓'
+                                  isOpenSelected && '✓'
                                 )}
                               </button>
                             </td>
