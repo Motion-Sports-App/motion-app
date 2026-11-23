@@ -1627,7 +1627,7 @@ export default function Dashboard({
 
               {/* MATRIX TABLE */}
               <div className="mt-4 overflow-x-auto rounded-xl border border-black/15 dark:border-white/10">
-                <table className="w-full table-fixed text-left border-collapse min-w-[600px]">
+                <table className="w-full table-fixed text-left border-separate border-spacing-0 min-w-[600px]">
                   <thead>
                     <tr className="bg-[#101310] text-white text-[11px] font-black uppercase">
                       <th className="px-3 py-2 border-r border-white/10 w-24">
@@ -1695,12 +1695,12 @@ export default function Dashboard({
                             .filter(Boolean)
                             .join(' ');
 
-                          // Draw crisp 2px black perimeter around each contiguous booking block
+                          // Draw crisp 2px black perimeter around each contiguous booking block and eliminate vertical white seams
                           const bookingPerimeterClasses = cluster
                             ? [
                                 cluster.topEdge
                                   ? 'border-t-2 border-t-[#101310] dark:border-t-[#F7F8F4]'
-                                  : '',
+                                  : '-mt-[1px] !h-[33px]',
                                 cluster.bottomEdge
                                   ? 'border-b-2 border-b-[#101310] dark:border-b-[#F7F8F4]'
                                   : '',
