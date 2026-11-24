@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 const AVATAR_THEME_CLASSES: Record<string, string> = {
@@ -14,11 +13,13 @@ const AVATAR_THEME_CLASSES: Record<string, string> = {
 
 export default function AccountDropdown({
   user,
+  onProfileOpen,
   onBookingsOpen,
   onMotionAdminOpen,
   onVenueAdminOpen,
 }: {
   user: any;
+  onProfileOpen: () => void;
   onBookingsOpen: () => void;
   onMotionAdminOpen: () => void;
   onVenueAdminOpen: () => void;
@@ -83,13 +84,15 @@ export default function AccountDropdown({
             </div>
 
             <div className="py-1 space-y-0.5">
-              <Link
-                href="/profile"
-                onClick={() => setOpen(false)}
-                className="block w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-[#101310] dark:text-[#F7F8F4] hover:bg-[#f7f8f4] dark:hover:bg-white/10"
+              <button
+                onClick={() => {
+                  onProfileOpen();
+                  setOpen(false);
+                }}
+                className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-[#101310] dark:text-[#F7F8F4] hover:bg-[#f7f8f4] dark:hover:bg-white/10"
               >
                 👤 My Profile
-              </Link>
+              </button>
 
               <button
                 onClick={() => {

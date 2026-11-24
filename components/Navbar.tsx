@@ -8,6 +8,7 @@ import { useTheme } from '@/components/ThemeProvider';
 export default function Navbar({
   user,
   onNavigate,
+  onProfileOpen,
   onBookingsOpen,
   onVenueAdminOpen,
   onMotionAdminOpen,
@@ -15,6 +16,7 @@ export default function Navbar({
 }: {
   user: any;
   onNavigate: (targetId?: string) => void;
+  onProfileOpen: () => void;
   onBookingsOpen: () => void;
   onVenueAdminOpen: () => void;
   onMotionAdminOpen: () => void;
@@ -73,6 +75,7 @@ export default function Navbar({
           {user ? (
             <AccountDropdown
               user={user}
+              onProfileOpen={onProfileOpen}
               onBookingsOpen={onBookingsOpen}
               onVenueAdminOpen={onVenueAdminOpen}
               onMotionAdminOpen={onMotionAdminOpen}
