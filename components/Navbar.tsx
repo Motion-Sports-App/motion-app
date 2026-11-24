@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { Menu, Moon, Sun, X, Zap } from 'lucide-react';
 import AccountDropdown from '@/components/AccountDropdown';
 import { useTheme } from '@/components/ThemeProvider';
+import type { UserProfile } from '@/lib/services/profileService';
 
 export default function Navbar({
   user,
+  profile,
   onNavigate,
   onProfileOpen,
   onBookingsOpen,
@@ -15,6 +17,7 @@ export default function Navbar({
   onAuthModalOpen,
 }: {
   user: any;
+  profile?: UserProfile | null;
   onNavigate: (targetId?: string) => void;
   onProfileOpen: () => void;
   onBookingsOpen: () => void;
@@ -75,6 +78,7 @@ export default function Navbar({
           {user ? (
             <AccountDropdown
               user={user}
+              profile={profile}
               onProfileOpen={onProfileOpen}
               onBookingsOpen={onBookingsOpen}
               onVenueAdminOpen={onVenueAdminOpen}

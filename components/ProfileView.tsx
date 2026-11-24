@@ -13,8 +13,12 @@ import {
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
 import DefaultAvatar from '@/components/DefaultAvatar';
+import {
+  profileService,
+  type UserProfile,
+  type SportEntry,
+} from '@/lib/services/profileService';
 
 const SPORT_OPTIONS = [
   'Badminton',
@@ -31,13 +35,10 @@ const SKILL_LEVELS = ['Casual', 'Intermediate', 'Club', 'Competitive'] as const;
 const HANDEDNESS_OPTIONS = ['Right-handed', 'Left-handed', 'Ambidextrous'] as const;
 const FORMAT_OPTIONS = ['Singles', 'Doubles', 'Mixed Doubles', 'Team / 5v5'] as const;
 
-type SportEntry = {
-  sport: string;
-  level: (typeof SKILL_LEVELS)[number];
-};
-
-// Center-crop and compress uploaded/captured photos so they fit cleanly in user metadata
-function compressImageFile(file: File | Blob, maxSize = 320): Promise<string> {
+function compressImage(
+  source: File | Blob,
+  maxSize = 320
+): Promise<{ blob: Blob; dataUrl: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -53,93 +54,117 @@ function compressImageFile(file: File | Blob, maxSize = 320): Promise<string> {
         const sx = (img.width - side) / 2;
         const sy = (img.height - side) / 2;
         ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error('Blob conversion failed'));
+            resolve({ blob, dataUrl });
+          },
+          'image/jpeg',
+          0.85
+        );
       };
       img.onerror = reject;
       if (typeof reader.result === 'string') img.src = reader.result;
     };
     reader.onerror = reject;
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(source);
   });
 }
 
 export default function ProfileView({
   user,
-  onUserUpdated,
+  profile,
+  onProfileUpdated,
 }: {
   user: any;
-  onUserUpdated?: (updatedUser: any) => void;
+  profile: UserProfile | null;
+  onProfileUpdated?: (updatedProfile: UserProfile) => void;
 }) {
   const [saving, setSaving] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
-  // Live webcam modal state (for desktop/laptop cameras)
   const [cameraOpen, setCameraOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
-  const meta = user?.user_metadata || {};
-
-  const [avatarUrl, setAvatarUrl] = useState<string>(meta.avatar_url || '');
+  const [avatarUrl, setAvatarUrl] = useState<string>(profile?.avatar_url || '');
   const [displayName, setDisplayName] = useState<string>(
-    meta.display_name || meta.full_name || user?.email?.split('@')[0] || ''
+    profile?.display_name || user?.email?.split('@')[0] || ''
   );
-  const [fullName, setFullName] = useState<string>(meta.full_name || '');
-  const [bio, setBio] = useState<string>(meta.bio || '');
-  const [homeArea, setHomeArea] = useState<string>(meta.home_area || '');
-  const [handedness, setHandedness] = useState<string>(meta.handedness || 'Right-handed');
+  const [fullName, setFullName] = useState<string>(profile?.full_name || '');
+  const [phone, setPhone] = useState<string>(profile?.phone || '');
+  const [bio, setBio] = useState<string>(profile?.bio || '');
+  const [homeArea, setHomeArea] = useState<string>(profile?.home_area || '');
+  const [handedness, setHandedness] = useState<string>(
+    profile?.handedness || 'Right-handed'
+  );
   const [preferredFormat, setPreferredFormat] = useState<string>(
-    meta.preferred_format || 'Doubles'
+    profile?.preferred_format || 'Doubles'
   );
-  const [openToMatch, setOpenToMatch] = useState<boolean>(meta.open_to_match ?? true);
-
+  const [openToMatch, setOpenToMatch] = useState<boolean>(
+    profile?.open_to_match ?? true
+  );
   const [sports, setSports] = useState<SportEntry[]>(
-    Array.isArray(meta.sports) && meta.sports.length > 0
-      ? meta.sports
+    profile?.sports && profile.sports.length > 0
+      ? profile.sports
       : [{ sport: 'Badminton', level: 'Intermediate' }]
   );
-  const [gearList, setGearList] = useState<string[]>(
-    Array.isArray(meta.gear) ? meta.gear : []
-  );
+  const [gearList, setGearList] = useState<string[]>(profile?.gear || []);
   const [gearInput, setGearInput] = useState('');
 
   useEffect(() => {
-    if (!user) return;
-    const m = user.user_metadata || {};
-    setAvatarUrl(m.avatar_url || '');
-    setDisplayName(m.display_name || m.full_name || user.email?.split('@')[0] || '');
-    setFullName(m.full_name || '');
-    setBio(m.bio || '');
-    setHomeArea(m.home_area || '');
-    setHandedness(m.handedness || 'Right-handed');
-    setPreferredFormat(m.preferred_format || 'Doubles');
-    setOpenToMatch(m.open_to_match ?? true);
-    if (Array.isArray(m.sports) && m.sports.length > 0) setSports(m.sports);
-    if (Array.isArray(m.gear)) setGearList(m.gear);
-  }, [user]);
+    if (!profile) return;
+    setAvatarUrl(profile.avatar_url || '');
+    setDisplayName(profile.display_name || user?.email?.split('@')[0] || '');
+    setFullName(profile.full_name || '');
+    setPhone(profile.phone || '');
+    setBio(profile.bio || '');
+    setHomeArea(profile.home_area || '');
+    setHandedness(profile.handedness || 'Right-handed');
+    setPreferredFormat(profile.preferred_format || 'Doubles');
+    setOpenToMatch(profile.open_to_match ?? true);
+    if (Array.isArray(profile.sports) && profile.sports.length > 0) {
+      setSports(profile.sports);
+    }
+    if (Array.isArray(profile.gear)) {
+      setGearList(profile.gear);
+    }
+  }, [profile, user?.email]);
 
-  // Clean up camera stream on unmount
   useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((t) => t.stop());
     };
   }, []);
 
-  const processSelectedFile = async (file?: File) => {
-    if (!file || !file.type.startsWith('image/')) return;
+  const processSelectedFile = async (file?: File | Blob) => {
+    if (!file || !user?.id) return;
+    setUploadingPhoto(true);
     try {
-      const compressed = await compressImageFile(file);
-      setAvatarUrl(compressed);
+      const { blob, dataUrl } = await compressImage(file);
+      const uploadedUrl = await profileService.uploadAvatarBlob(
+        user.id,
+        blob,
+        dataUrl
+      );
+      setAvatarUrl(uploadedUrl);
     } catch {
       alert('Could not process that image. Please try another photo.');
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) processSelectedFile(file);
+    if (file && file.type.startsWith('image/')) {
+      processSelectedFile(file);
+    }
     e.target.value = '';
   };
 
@@ -147,7 +172,9 @@ export default function ProfileView({
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) processSelectedFile(file);
+    if (file && file.type.startsWith('image/')) {
+      processSelectedFile(file);
+    }
   };
 
   const openCamera = async () => {
@@ -164,7 +191,9 @@ export default function ProfileView({
         }
       }, 50);
     } catch {
-      alert('Camera access was blocked or unavailable on this device. Please choose a photo from your gallery instead.');
+      alert(
+        'Camera access was blocked or unavailable on this device. Please choose a photo from your gallery instead.'
+      );
     }
   };
 
@@ -188,7 +217,13 @@ export default function ProfileView({
     const sy = (video.videoHeight - side) / 2;
     ctx.drawImage(video, sx, sy, side, side, 0, 0, 320, 320);
 
-    setAvatarUrl(canvas.toDataURL('image/jpeg', 0.85));
+    canvas.toBlob(
+      (blob) => {
+        if (blob) processSelectedFile(blob);
+      },
+      'image/jpeg',
+      0.85
+    );
     closeCamera();
   };
 
@@ -200,7 +235,10 @@ export default function ProfileView({
     });
   };
 
-  const updateSportLevel = (sportName: string, level: (typeof SKILL_LEVELS)[number]) => {
+  const updateSportLevel = (
+    sportName: string,
+    level: (typeof SKILL_LEVELS)[number]
+  ) => {
     setSports((prev) =>
       prev.map((s) => (s.sport === sportName ? { ...s, level } : s))
     );
@@ -215,42 +253,38 @@ export default function ProfileView({
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user?.id) return;
 
     setSaving(true);
     setSavedToast(false);
 
-    try {
-      const payload = {
-        avatar_url: avatarUrl,
-        display_name: displayName.trim(),
-        full_name: fullName.trim(),
-        bio: bio.trim(),
-        home_area: homeArea.trim(),
-        handedness,
-        preferred_format: preferredFormat,
-        open_to_match: openToMatch,
-        sports,
-        gear: gearList,
-      };
+    const { profile: updated, error } = await profileService.update(user.id, {
+      avatar_url: avatarUrl,
+      display_name: displayName.trim(),
+      full_name: fullName.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      home_area: homeArea.trim(),
+      handedness,
+      preferred_format: preferredFormat,
+      open_to_match: openToMatch,
+      sports,
+      gear: gearList,
+    });
 
-      const { data, error } = await supabase.auth.updateUser({
-        data: payload,
-      });
+    setSaving(false);
 
-      if (error) throw error;
-
-      if (data?.user && onUserUpdated) {
-        onUserUpdated(data.user);
-      }
-
-      setSavedToast(true);
-      setTimeout(() => setSavedToast(false), 3000);
-    } catch (err: any) {
-      alert(`Could not save profile: ${err.message}`);
-    } finally {
-      setSaving(false);
+    if (error) {
+      alert(`Could not save profile: ${error}`);
+      return;
     }
+
+    if (updated && onProfileUpdated) {
+      onProfileUpdated(updated);
+    }
+
+    setSavedToast(true);
+    setTimeout(() => setSavedToast(false), 3000);
   };
 
   return (
@@ -280,13 +314,16 @@ export default function ProfileView({
           }`}
         >
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center border-b border-black/10 dark:border-white/10 pb-6">
-            {/* Avatar Preview Circle */}
             <div
               onClick={() => galleryInputRef.current?.click()}
               title="Click or drop an image to change profile picture"
               className="group relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 border-black/15 dark:border-white/15 bg-[#9E9E9E]"
             >
-              {avatarUrl ? (
+              {uploadingPhoto ? (
+                <div className="flex h-full w-full items-center justify-center bg-black/60 text-white">
+                  <Loader2 size={22} className="animate-spin" />
+                </div>
+              ) : avatarUrl ? (
                 <img
                   src={avatarUrl}
                   alt="Profile avatar"
@@ -301,7 +338,6 @@ export default function ProfileView({
               </div>
             </div>
 
-            {/* Camera, Gallery & Drop Controls */}
             <div className="flex-1">
               <h1 className="text-xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
                 Customize Your Profile
@@ -348,7 +384,7 @@ export default function ProfileView({
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
               <label className="block text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4]">
                 Display Name (shown on court matrix)
@@ -377,7 +413,20 @@ export default function ProfileView({
               />
             </div>
 
-            <div className="sm:col-span-2">
+            <div>
+              <label className="block text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4]">
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 081-234-5678"
+                className="mt-1.5 w-full rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3.5 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-[#81971d] dark:focus:border-[#d8ff3e]"
+              />
+            </div>
+
+            <div className="sm:col-span-3">
               <label className="block text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4]">
                 Bio / Player Intro
               </label>
@@ -591,7 +640,7 @@ export default function ProfileView({
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || uploadingPhoto}
             className="inline-flex items-center gap-2 rounded-xl bg-[#d8ff3e] px-5 py-2.5 text-xs font-black text-[#101310] border border-black/15 shadow-sm transition hover:bg-[#cbf528] disabled:opacity-50"
           >
             {saving ? (

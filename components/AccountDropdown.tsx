@@ -3,15 +3,18 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import DefaultAvatar from '@/components/DefaultAvatar';
+import type { UserProfile } from '@/lib/services/profileService';
 
 export default function AccountDropdown({
   user,
+  profile,
   onProfileOpen,
   onBookingsOpen,
   onMotionAdminOpen,
   onVenueAdminOpen,
 }: {
   user: any;
+  profile?: UserProfile | null;
   onProfileOpen: () => void;
   onBookingsOpen: () => void;
   onMotionAdminOpen: () => void;
@@ -21,10 +24,13 @@ export default function AccountDropdown({
 
   const meta = user?.user_metadata || {};
   const displayName =
-    meta.display_name || meta.full_name || user.email?.split('@')[0] || 'User';
-  const avatarUrl = meta.avatar_url || '';
+    profile?.display_name ||
+    profile?.full_name ||
+    meta.full_name ||
+    user.email?.split('@')[0] ||
+    'User';
+  const avatarUrl = profile?.avatar_url || '';
 
-  // Check if account is a Super Admin
   const isMotionAdmin =
     user?.email &&
     [
@@ -34,7 +40,6 @@ export default function AccountDropdown({
       'kvorakijkamjorn@gmail.com',
     ].includes(user.email.toLowerCase());
 
-  // Show Venue Control if user is approved venue owner OR super admin
   const isApprovedVenue =
     isMotionAdmin ||
     meta.role === 'venue_owner' ||
@@ -106,7 +111,6 @@ export default function AccountDropdown({
                 </button>
               )}
 
-              {/* ONLY SHOWN IF APPROVED OR SUPER ADMIN */}
               {isApprovedVenue && (
                 <button
                   onClick={() => {

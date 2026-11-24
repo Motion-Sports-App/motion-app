@@ -15,6 +15,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { venueService } from '@/lib/services/venueService';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
+import { profileService, type UserProfile } from '@/lib/services/profileService';
 import { SPORTS_LIST, DEFAULT_VENUE_IMAGE } from '@/lib/constants';
 import { useBrowserHistorySync } from '@/hooks/useBrowserHistoryState';
 import type { Sport, Venue } from '@/lib/data';
@@ -53,6 +54,7 @@ type ActiveView =
 export default function Home() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [venues, setVenues] = useState<Venue[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeSport, setActiveSport] = useState<Sport>('All sports');
@@ -140,6 +142,14 @@ export default function Home() {
     });
     return () => authListener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      profileService.getOrCreate(user).then(setProfile);
+    } else {
+      setProfile(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user?.email) {
@@ -287,6 +297,7 @@ export default function Home() {
 
         <Navbar
           user={user}
+          profile={profile}
           onNavigate={handleNavigate}
           onProfileOpen={handleProfileOpen}
           onBookingsOpen={handleBookingsOpen}
@@ -300,7 +311,8 @@ export default function Home() {
       {activeView === 'profile' && user ? (
         <ProfileView
           user={user}
-          onUserUpdated={(updatedUser) => setUser(updatedUser)}
+          profile={profile}
+          onProfileUpdated={(updatedProfile) => setProfile(updatedProfile)}
         />
       ) : activeView === 'motion-admin' ? (
         <MotionAdminCenter
@@ -352,7 +364,7 @@ export default function Home() {
               <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]">
                 <Sparkles size={14} className="text-[#829e12] dark:text-[#d8ff3e]" /> ONE HOME FOR EVERY GAME
               </div>
-                            <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em]">
+              <h1 className="max-w-2xl text-[clamp(3.7rem,8vw,7.5rem)] font-black leading-[.86] tracking-[-.085em]">
                 What&apos;s the<br />
                 <span className="relative inline-block">
                   move<span className="absolute -bottom-1 left-1 h-2 w-[95%] -rotate-2 bg-[#d8ff3e] sm:h-3" />
