@@ -1,51 +1,63 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import DefaultAvatar from '@/components/DefaultAvatar';
 
 export default function AccountDropdown({
   user,
+  onProfileOpen,
   onBookingsOpen,
   onMotionAdminOpen,
   onVenueAdminOpen,
 }: {
   user: any;
+  onProfileOpen: () => void;
   onBookingsOpen: () => void;
   onMotionAdminOpen: () => void;
   onVenueAdminOpen: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
-  const displayName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'User';
-  const initial = displayName[0].toUpperCase();
+  const meta = user?.user_metadata || {};
+  const displayName =
+    meta.display_name || meta.full_name || user.email?.split('@')[0] || 'User';
+  const avatarUrl = meta.avatar_url || '';
 
   // Check if account is a Super Admin
   const isMotionAdmin =
     user?.email &&
     [
+      'darylhsu45@gmail.com',
       'mingtan0403@gmail.com',
       'motionsportsapp@gmail.com',
-      'kvorakijkamjorn@gmail.com'
+      'kvorakijkamjorn@gmail.com',
     ].includes(user.email.toLowerCase());
 
   // Show Venue Control if user is approved venue owner OR super admin
   const isApprovedVenue =
     isMotionAdmin ||
-    user?.user_metadata?.role === 'venue_owner' ||
-    user?.user_metadata?.is_approved_venue === true;
+    meta.role === 'venue_owner' ||
+    meta.is_approved_venue === true;
 
   return (
     <div className="relative">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 sm:gap-2 rounded-full border border-black/15 dark:border-white/10 bg-white dark:bg-[#0B0B0C] px-2.5 py-1 sm:px-3 sm:py-1.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] transition hover:bg-black/5 dark:hover:bg-white/10"
+        aria-label="Account menu"
+        title={displayName}
+        className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center overflow-hidden rounded-full border border-black/15 dark:border-white/15 bg-[#9E9E9E] transition hover:scale-105"
       >
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-[#101310] dark:bg-[#d8ff3e] text-[11px] font-black text-[#d8ff3e] dark:text-[#101310]">
-          {initial}
-        </span>
-        <span className="max-w-[70px] sm:max-w-[100px] truncate">{displayName}</span>
-        <ChevronDown size={14} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+        {avatarUrl ? (
+          <img
+            src={avatarUrl}
+            alt={displayName}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <DefaultAvatar />
+        )}
       </button>
 
       {open && (
@@ -53,11 +65,25 @@ export default function AccountDropdown({
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div className="absolute right-0 z-40 mt-2 w-56 rounded-2xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-2 shadow-xl animate-in fade-in zoom-in-95">
             <div className="border-b border-black/10 dark:border-white/10 px-3 py-2">
-              <p className="truncate text-xs font-black text-[#101310] dark:text-[#F7F8F4]">{displayName}</p>
-              <p className="truncate text-[10px] text-black/45 dark:text-[#F7F8F4]/50">{user.email}</p>
+              <p className="truncate text-xs font-black text-[#101310] dark:text-[#F7F8F4]">
+                {displayName}
+              </p>
+              <p className="truncate text-[10px] text-black/45 dark:text-[#F7F8F4]/50">
+                {user.email}
+              </p>
             </div>
 
             <div className="py-1 space-y-0.5">
+              <button
+                onClick={() => {
+                  onProfileOpen();
+                  setOpen(false);
+                }}
+                className="w-full rounded-xl px-3 py-2 text-left text-xs font-bold text-[#101310] dark:text-[#F7F8F4] hover:bg-[#f7f8f4] dark:hover:bg-white/10"
+              >
+                👤 My Profile
+              </button>
+
               <button
                 onClick={() => {
                   onBookingsOpen();

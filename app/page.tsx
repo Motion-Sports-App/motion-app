@@ -27,6 +27,7 @@ import UserBookingsView from '@/components/UserBookingsView';
 import Dashboard from '@/components/Dashboard';
 import PartnerOnboardingView from '@/components/PartnerOnboardingView';
 import MotionAdminCenter from '@/components/MotionAdminCenter';
+import ProfileView from '@/components/ProfileView';
 import { partnerService } from '@/lib/services/partnerService';
 
 const money = (n?: number | null) => {
@@ -43,6 +44,7 @@ const dateLabel = (d: Date) => {
 
 type ActiveView =
   | 'home'
+  | 'profile'
   | 'bookings'
   | 'venue-admin'
   | 'partner-onboarding'
@@ -82,6 +84,7 @@ export default function Home() {
   const handleSetActiveView = useCallback((view: string) => {
     const validViews: ActiveView[] = [
       'home',
+      'profile',
       'bookings',
       'venue-admin',
       'partner-onboarding',
@@ -250,6 +253,10 @@ export default function Home() {
     navigateTo('motion-admin', null);
   };
 
+  const handleProfileOpen = () => {
+    navigateTo('profile', null);
+  };
+
   const handleBookingsOpen = () => {
     if (user?.email) {
       bookingService.getByUserEmail(user.email).then(setBookings);
@@ -281,6 +288,7 @@ export default function Home() {
         <Navbar
           user={user}
           onNavigate={handleNavigate}
+          onProfileOpen={handleProfileOpen}
           onBookingsOpen={handleBookingsOpen}
           onVenueAdminOpen={handleVenueAdminAccess}
           onMotionAdminOpen={handleMotionAdminOpen}
@@ -289,7 +297,12 @@ export default function Home() {
       </div>
 
       {/* RENDER ACTIVE VIEW BASED ON SYNCED VIEW STATE */}
-      {activeView === 'motion-admin' ? (
+      {activeView === 'profile' && user ? (
+        <ProfileView
+          user={user}
+          onUserUpdated={(updatedUser) => setUser(updatedUser)}
+        />
+      ) : activeView === 'motion-admin' ? (
         <MotionAdminCenter
           user={user}
           onBack={() => resetViews(true)}
