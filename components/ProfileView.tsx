@@ -428,14 +428,13 @@ export default function ProfileView({
 
             <div className="sm:col-span-3">
               <label className="block text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4]">
-                Bio / Player Intro
+                Bio / Description
               </label>
               <textarea
                 rows={2}
                 maxLength={220}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                placeholder="Always down for fast-paced badminton doubles after 6 PM or weekend padel..."
                 className="mt-1.5 w-full rounded-xl border border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3.5 py-2 text-xs font-medium text-[#101310] dark:text-[#F7F8F4] outline-none focus:border-[#81971d] dark:focus:border-[#d8ff3e]"
               />
             </div>
