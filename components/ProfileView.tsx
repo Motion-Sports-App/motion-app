@@ -1,17 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Camera,
   Check,
+  ImagePlus,
   Loader2,
   Plus,
+  Trash2,
   X,
   Trophy,
   Sparkles,
   ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import DefaultAvatar from '@/components/DefaultAvatar';
 
 const SPORT_OPTIONS = [
   'Badminton',
@@ -28,18 +31,37 @@ const SKILL_LEVELS = ['Casual', 'Intermediate', 'Club', 'Competitive'] as const;
 const HANDEDNESS_OPTIONS = ['Right-handed', 'Left-handed', 'Ambidextrous'] as const;
 const FORMAT_OPTIONS = ['Singles', 'Doubles', 'Mixed Doubles', 'Team / 5v5'] as const;
 
-const AVATAR_PRESETS = [
-  { id: 'lime', bg: 'bg-[#101310] text-[#d8ff3e]', label: 'Motion Dark' },
-  { id: 'volt', bg: 'bg-[#d8ff3e] text-[#101310]', label: 'Volt Lime' },
-  { id: 'emerald', bg: 'bg-emerald-600 text-white', label: 'Court Green' },
-  { id: 'amber', bg: 'bg-amber-500 text-[#101310]', label: 'Clay Amber' },
-  { id: 'indigo', bg: 'bg-indigo-600 text-white', label: 'Night Session' },
-];
-
 type SportEntry = {
   sport: string;
   level: (typeof SKILL_LEVELS)[number];
 };
+
+// Center-crop and compress uploaded/captured photos so they fit cleanly in user metadata
+function compressImageFile(file: File | Blob, maxSize = 320): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = maxSize;
+        canvas.height = maxSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('Canvas unsupported'));
+
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2;
+        const sy = (img.height - side) / 2;
+        ctx.drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.onerror = reject;
+      if (typeof reader.result === 'string') img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function ProfileView({
   user,
@@ -50,11 +72,17 @@ export default function ProfileView({
 }) {
   const [saving, setSaving] = useState(false);
   const [savedToast, setSavedToast] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Live webcam modal state (for desktop/laptop cameras)
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   const meta = user?.user_metadata || {};
 
   const [avatarUrl, setAvatarUrl] = useState<string>(meta.avatar_url || '');
-  const [avatarTheme, setAvatarTheme] = useState<string>(meta.avatar_theme || 'lime');
   const [displayName, setDisplayName] = useState<string>(
     meta.display_name || meta.full_name || user?.email?.split('@')[0] || ''
   );
@@ -81,7 +109,6 @@ export default function ProfileView({
     if (!user) return;
     const m = user.user_metadata || {};
     setAvatarUrl(m.avatar_url || '');
-    setAvatarTheme(m.avatar_theme || 'lime');
     setDisplayName(m.display_name || m.full_name || user.email?.split('@')[0] || '');
     setFullName(m.full_name || '');
     setBio(m.bio || '');
@@ -92,6 +119,78 @@ export default function ProfileView({
     if (Array.isArray(m.sports) && m.sports.length > 0) setSports(m.sports);
     if (Array.isArray(m.gear)) setGearList(m.gear);
   }, [user]);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  const processSelectedFile = async (file?: File) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      const compressed = await compressImageFile(file);
+      setAvatarUrl(compressed);
+    } catch {
+      alert('Could not process that image. Please try another photo.');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processSelectedFile(file);
+    e.target.value = '';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processSelectedFile(file);
+  };
+
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 640, height: 640 },
+        audio: false,
+      });
+      streamRef.current = stream;
+      setCameraOpen(true);
+      setTimeout(() => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+        }
+      }, 50);
+    } catch {
+      alert('Camera access was blocked or unavailable on this device. Please choose a photo from your gallery instead.');
+    }
+  };
+
+  const closeCamera = () => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    setCameraOpen(false);
+  };
+
+  const captureFromCamera = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = 320;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const side = Math.min(video.videoWidth, video.videoHeight);
+    const sx = (video.videoWidth - side) / 2;
+    const sy = (video.videoHeight - side) / 2;
+    ctx.drawImage(video, sx, sy, side, side, 0, 0, 320, 320);
+
+    setAvatarUrl(canvas.toDataURL('image/jpeg', 0.85));
+    closeCamera();
+  };
 
   const toggleSport = (sportName: string) => {
     setSports((prev) => {
@@ -114,18 +213,6 @@ export default function ProfileView({
     setGearInput('');
   };
 
-  const handleAvatarUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setAvatarUrl(reader.result);
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -136,7 +223,6 @@ export default function ProfileView({
     try {
       const payload = {
         avatar_url: avatarUrl,
-        avatar_theme: avatarTheme,
         display_name: displayName.trim(),
         full_name: fullName.trim(),
         bio: bio.trim(),
@@ -167,12 +253,6 @@ export default function ProfileView({
     }
   };
 
-  const selectedThemeObj =
-    AVATAR_PRESETS.find((p) => p.id === avatarTheme) || AVATAR_PRESETS[0];
-  const initialChar = (displayName || fullName || user?.email || 'M')
-    .charAt(0)
-    .toUpperCase();
-
   return (
     <section className="mx-auto min-h-[85vh] max-w-6xl px-5 py-6 lg:px-8 lg:py-8">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-black/10 dark:border-white/10 pb-4">
@@ -185,71 +265,83 @@ export default function ProfileView({
       </div>
 
       <form onSubmit={handleSaveProfile} className="mt-5 space-y-5">
-        {/* CARD 1: AVATAR & IDENTITY */}
-        <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
+        {/* CARD 1: AVATAR UPLOAD / CAMERA / DRAG-AND-DROP & IDENTITY */}
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`rounded-3xl border transition bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm ${
+            isDragging
+              ? 'border-2 border-dashed border-[#81971d] dark:border-[#d8ff3e] bg-[#f7f8f4] dark:bg-[#1E2025]'
+              : 'border-black/10 dark:border-white/10'
+          }`}
+        >
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center border-b border-black/10 dark:border-white/10 pb-6">
-            <div className="relative shrink-0">
-              <div
-                className={`flex h-20 w-20 items-center justify-center rounded-full border-2 border-[#101310] dark:border-white/20 text-2xl font-black overflow-hidden ${selectedThemeObj.bg}`}
-              >
-                {avatarUrl ? (
-                  <img
-                    src={avatarUrl}
-                    alt="Profile avatar"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  initialChar
-                )}
-              </div>
-
-              <label
-                title="Upload profile picture"
-                className="absolute -bottom-1 -right-1 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full bg-[#d8ff3e] text-[#101310] border border-black/20 shadow transition hover:scale-105"
-              >
-                <Camera size={13} />
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  className="hidden"
+            {/* Avatar Preview Circle */}
+            <div
+              onClick={() => galleryInputRef.current?.click()}
+              title="Click or drop an image to change profile picture"
+              className="group relative h-24 w-24 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 border-black/15 dark:border-white/15 bg-[#9E9E9E]"
+            >
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="Profile avatar"
+                  className="h-full w-full object-cover"
                 />
-              </label>
+              ) : (
+                <DefaultAvatar />
+              )}
+
+              <div className="absolute inset-0 flex items-center justify-center bg-black/45 opacity-0 transition group-hover:opacity-100">
+                <ImagePlus size={20} className="text-white" />
+              </div>
             </div>
 
+            {/* Camera, Gallery & Drop Controls */}
             <div className="flex-1">
               <h1 className="text-xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
                 Customize Your Profile
               </h1>
               <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
-                Choose a custom photo or pick an avatar badge color shown on court bookings.
+                Take a photo with your camera, pick from your gallery, or drag &amp; drop an image anywhere here.
               </p>
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {AVATAR_PRESETS.map((preset) => (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    onClick={() => {
-                      setAvatarUrl('');
-                      setAvatarTheme(preset.id);
-                    }}
-                    className={`h-6 w-6 rounded-full border-2 transition ${preset.bg} ${
-                      !avatarUrl && avatarTheme === preset.id
-                        ? 'scale-110 border-[#81971d] dark:border-[#d8ff3e] ring-2 ring-black/20'
-                        : 'border-black/15 opacity-80 hover:opacity-100'
-                    }`}
-                    title={preset.label}
-                  />
-                ))}
+              <input
+                ref={galleryInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+
+              <div className="mt-3.5 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openCamera}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#101310] dark:bg-[#d8ff3e] px-3.5 py-2 text-xs font-black text-[#d8ff3e] dark:text-[#101310] transition hover:opacity-90"
+                >
+                  <Camera size={14} /> Take Photo
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => galleryInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-black/15 dark:border-white/15 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3.5 py-2 text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4] transition hover:bg-black/5 dark:hover:bg-white/10"
+                >
+                  <ImagePlus size={14} /> Choose from Gallery
+                </button>
 
                 {avatarUrl && (
                   <button
                     type="button"
                     onClick={() => setAvatarUrl('')}
-                    className="ml-2 text-xs font-bold text-red-600 dark:text-red-400 underline"
+                    className="inline-flex items-center gap-1 rounded-xl px-2.5 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/10"
                   >
-                    Remove photo
+                    <Trash2 size={13} /> Reset to Default
                   </button>
                 )}
               </div>
@@ -306,7 +398,7 @@ export default function ProfileView({
           <div className="flex items-center gap-2">
             <Trophy size={16} className="text-[#81971d] dark:text-[#d8ff3e]" />
             <h2 className="text-lg font-black text-[#101310] dark:text-[#F7F8F4]">
-              Sports I Play & Skill Level
+              Sports I Play &amp; Skill Level
             </h2>
           </div>
           <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
@@ -416,7 +508,7 @@ export default function ProfileView({
           <label className="mt-4 flex cursor-pointer items-center justify-between rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-4 py-3">
             <div>
               <p className="text-xs font-black text-[#101310] dark:text-[#F7F8F4]">
-                Open to Hitting Partners & Open Games
+                Open to Hitting Partners &amp; Open Games
               </p>
               <p className="text-[11px] text-black/55 dark:text-[#F7F8F4]/60">
                 Let other players know you are up for casual rallies or fill-in spots.
@@ -514,6 +606,59 @@ export default function ProfileView({
           </button>
         </div>
       </form>
+
+      {/* LIVE CAMERA CAPTURE MODAL */}
+      {cameraOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={closeCamera}
+        >
+          <div
+            className="w-full max-w-sm rounded-3xl border border-white/10 bg-white dark:bg-[#16171A] p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3">
+              <p className="text-sm font-black text-[#101310] dark:text-[#F7F8F4]">
+                Take Profile Photo
+              </p>
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="rounded-full p-1 text-black/50 hover:text-black dark:text-white/60 dark:hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black">
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="h-full w-full -scale-x-100 object-cover"
+              />
+            </div>
+
+            <div className="mt-4 flex gap-2">
+              <button
+                type="button"
+                onClick={closeCamera}
+                className="flex-1 rounded-xl border border-black/15 dark:border-white/15 py-2.5 text-xs font-bold text-[#101310] dark:text-[#F7F8F4]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={captureFromCamera}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#d8ff3e] py-2.5 text-xs font-black text-[#101310]"
+              >
+                <Camera size={14} /> Capture
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }

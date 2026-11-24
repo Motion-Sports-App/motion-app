@@ -2,14 +2,7 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-
-const AVATAR_THEME_CLASSES: Record<string, string> = {
-  lime: 'bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310]',
-  volt: 'bg-[#d8ff3e] text-[#101310]',
-  emerald: 'bg-emerald-600 text-white',
-  amber: 'bg-amber-500 text-[#101310]',
-  indigo: 'bg-indigo-600 text-white',
-};
+import DefaultAvatar from '@/components/DefaultAvatar';
 
 export default function AccountDropdown({
   user,
@@ -30,9 +23,6 @@ export default function AccountDropdown({
   const displayName =
     meta.display_name || meta.full_name || user.email?.split('@')[0] || 'User';
   const avatarUrl = meta.avatar_url || '';
-  const avatarThemeClass =
-    AVATAR_THEME_CLASSES[meta.avatar_theme] || AVATAR_THEME_CLASSES.lime;
-  const initial = displayName[0].toUpperCase();
 
   // Check if account is a Super Admin
   const isMotionAdmin =
@@ -57,7 +47,7 @@ export default function AccountDropdown({
         onClick={() => setOpen(!open)}
         aria-label="Account menu"
         title={displayName}
-        className={`grid h-9 w-9 sm:h-10 sm:w-10 place-items-center overflow-hidden rounded-full border border-black/15 dark:border-white/15 text-xs sm:text-sm font-black transition hover:scale-105 ${avatarThemeClass}`}
+        className="grid h-9 w-9 sm:h-10 sm:w-10 place-items-center overflow-hidden rounded-full border border-black/15 dark:border-white/15 bg-[#9E9E9E] transition hover:scale-105"
       >
         {avatarUrl ? (
           <img
@@ -66,7 +56,7 @@ export default function AccountDropdown({
             className="h-full w-full object-cover"
           />
         ) : (
-          initial
+          <DefaultAvatar />
         )}
       </button>
 
