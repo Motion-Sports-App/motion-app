@@ -25,8 +25,22 @@ export interface CoachApplicationData {
   sport: string;
   hourlyRate: number;
   bio: string;
-  employmentType: 'freelance' | 'venue_affiliated';
-  venueId?: string;
+}
+
+export interface CoachVenueAffiliation {
+  id: string;
+  coach_user_id: string | null;
+  coach_name: string;
+  coach_email: string;
+  sport: string;
+  hourly_rate: number;
+  bio?: string;
+  employment_type?: string;
+  venue_id?: string | null;
+  venue_name?: string | null;
+  initiated_by?: 'coach' | 'venue';
+  status: 'pending_venue_approval' | 'pending_coach_approval' | 'approved' | 'rejected';
+  created_at?: string;
 }
 
 export interface OperatingHours {
@@ -78,7 +92,6 @@ export const partnerService = {
 
   async submitVenueApplication(userId: string, data: VenueApplicationData) {
     try {
-      // 1. Check if user already has a pending or approved venue application
       const { data: existing, error: checkError } = await supabase
         .from('venue_applications')
         .select('id, status')
@@ -172,13 +185,14 @@ export const partnerService = {
     }
   },
 
+  // 1. Register standalone Coach Profile on Motion
   async submitCoachApplication(userId: string, data: CoachApplicationData) {
     try {
       const { data: existing, error: checkError } = await supabase
         .from('coach_venue_affiliations')
         .select('id, status')
         .eq('coach_user_id', userId)
-        .in('status', ['pending', 'pending_venue_approval', 'approved'])
+        .is('venue_id', null)
         .limit(1);
 
       if (checkError) throw checkError;
@@ -186,7 +200,7 @@ export const partnerService = {
       if (existing && existing.length > 0) {
         return {
           success: false,
-          error: 'You already have an active or pending coach application.',
+          error: 'You already have an active coach profile on Motion.',
           alreadyExists: true,
           status: existing[0].status,
         };
@@ -198,16 +212,14 @@ export const partnerService = {
           {
             coach_user_id: userId,
             coach_name: data.coachName,
-            coach_email: data.coachEmail,
+            coach_email: data.coachEmail.trim().toLowerCase(),
             sport: data.sport,
-            hourly_rate: data.hourlyRate,
+            hourly_rate: Number(data.hourlyRate),
             bio: data.bio,
-            employment_type: data.employmentType,
-            venue_id: data.venueId || null,
-            status:
-              data.employmentType === 'freelance'
-                ? 'approved'
-                : 'pending_venue_approval',
+            employment_type: 'coach',
+            venue_id: null,
+            initiated_by: 'coach',
+            status: 'approved',
           },
         ])
         .select();
@@ -216,7 +228,7 @@ export const partnerService = {
         if (error.code === '23505') {
           return {
             success: false,
-            error: 'You already have an active or pending coach application.',
+            error: 'You already have an active coach profile on Motion.',
             alreadyExists: true,
           };
         }
@@ -226,6 +238,232 @@ export const partnerService = {
       return { success: true, data: result };
     } catch (error: any) {
       console.error('submitCoachApplication Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // 2. Coach applies to affiliate with a specific venue
+  async applyCoachToVenue(
+    userId: string,
+    venue: { id: string; name: string },
+    profile?: {
+      coachName?: string;
+      coachEmail?: string;
+      sport?: string;
+      hourlyRate?: number;
+      bio?: string;
+    }
+  ) {
+    try {
+      const { data: baseProfile } = await supabase
+        .from('coach_venue_affiliations')
+        .select('*')
+        .eq('coach_user_id', userId)
+        .is('venue_id', null)
+        .maybeSingle();
+
+      const { data: existingPair } = await supabase
+        .from('coach_venue_affiliations')
+        .select('id, status')
+        .eq('coach_user_id', userId)
+        .eq('venue_id', venue.id)
+        .in('status', ['pending_venue_approval', 'pending_coach_approval', 'approved'])
+        .maybeSingle();
+
+      if (existingPair) {
+        return {
+          success: false,
+          error:
+            existingPair.status === 'approved'
+              ? `You are already affiliated with ${venue.name}.`
+              : `You already have a pending request with ${venue.name}.`,
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('coach_venue_affiliations')
+        .insert([
+          {
+            coach_user_id: userId,
+            coach_name: baseProfile?.coach_name || profile?.coachName || 'Coach',
+            coach_email: (
+              baseProfile?.coach_email ||
+              profile?.coachEmail ||
+              ''
+            )
+              .trim()
+              .toLowerCase(),
+            sport: baseProfile?.sport || profile?.sport || 'Badminton',
+            hourly_rate: Number(baseProfile?.hourly_rate ?? profile?.hourlyRate ?? 500),
+            bio: baseProfile?.bio || profile?.bio || '',
+            employment_type: 'venue_affiliated',
+            venue_id: venue.id,
+            venue_name: venue.name,
+            initiated_by: 'coach',
+            status: 'pending_venue_approval',
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('applyCoachToVenue Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // 3. Venue owner adds/invites a coach to their venue by email
+  async addCoachToVenueByEmail(
+    venue: { id: string; name: string },
+    coachInput: {
+      coachEmail: string;
+      coachName?: string;
+      sport?: string;
+      hourlyRate?: number;
+    }
+  ) {
+    try {
+      const normalizedEmail = coachInput.coachEmail.trim().toLowerCase();
+      if (!normalizedEmail) {
+        return { success: false, error: 'Please enter a coach email address.' };
+      }
+
+      // Look up existing coach profile on Motion by email
+      const { data: existingCoach } = await supabase
+        .from('coach_venue_affiliations')
+        .select('*')
+        .ilike('coach_email', normalizedEmail)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      // Check if already affiliated/invited to this venue
+      const { data: dup } = await supabase
+        .from('coach_venue_affiliations')
+        .select('id, status')
+        .eq('venue_id', venue.id)
+        .ilike('coach_email', normalizedEmail)
+        .in('status', ['pending_venue_approval', 'pending_coach_approval', 'approved'])
+        .maybeSingle();
+
+      if (dup) {
+        return {
+          success: false,
+          error:
+            dup.status === 'approved'
+              ? 'This coach is already affiliated with your venue.'
+              : 'An affiliation request or invite is already active for this coach.',
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('coach_venue_affiliations')
+        .insert([
+          {
+            coach_user_id: existingCoach?.coach_user_id || null,
+            coach_name:
+              existingCoach?.coach_name ||
+              coachInput.coachName?.trim() ||
+              normalizedEmail.split('@')[0],
+            coach_email: normalizedEmail,
+            sport: existingCoach?.sport || coachInput.sport || 'Badminton',
+            hourly_rate: Number(
+              existingCoach?.hourly_rate ?? coachInput.hourlyRate ?? 500
+            ),
+            bio: existingCoach?.bio || '',
+            employment_type: 'venue_affiliated',
+            venue_id: venue.id,
+            venue_name: venue.name,
+            initiated_by: 'venue',
+            status: 'approved',
+          },
+        ])
+        .select();
+
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error: any) {
+      console.error('addCoachToVenueByEmail Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  // Get all coach affiliations & requests for a specific venue
+  async getVenueCoachAffiliations(venueId: string): Promise<CoachVenueAffiliation[]> {
+    try {
+      const { data, error } = await supabase
+        .from('coach_venue_affiliations')
+        .select('*')
+        .eq('venue_id', venueId)
+        .neq('status', 'rejected')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as CoachVenueAffiliation[];
+    } catch (error) {
+      console.error('getVenueCoachAffiliations Error:', error);
+      return [];
+    }
+  },
+
+  // Get base profile + venue affiliations for a coach
+  async getCoachAffiliations(userId: string, userEmail?: string): Promise<CoachVenueAffiliation[]> {
+    try {
+      const filters = [`coach_user_id.eq.${userId}`];
+      if (userEmail) {
+        filters.push(`coach_email.ilike.${userEmail.trim().toLowerCase()}`);
+      }
+
+      const { data, error } = await supabase
+        .from('coach_venue_affiliations')
+        .select('*')
+        .or(filters.join(','))
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return (data || []) as CoachVenueAffiliation[];
+    } catch (error) {
+      console.error('getCoachAffiliations Error:', error);
+      return [];
+    }
+  },
+
+  async respondToCoachAffiliation(
+    affiliationId: string,
+    status: 'approved' | 'rejected',
+    coachUserId?: string
+  ) {
+    try {
+      const updates: Record<string, any> = { status };
+      if (coachUserId) {
+        updates.coach_user_id = coachUserId;
+      }
+
+      const { error } = await supabase
+        .from('coach_venue_affiliations')
+        .update(updates)
+        .eq('id', affiliationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      console.error('respondToCoachAffiliation Error:', error);
+      return { success: false, error: error.message };
+    }
+  },
+
+  async removeCoachAffiliation(affiliationId: string) {
+    try {
+      const { error } = await supabase
+        .from('coach_venue_affiliations')
+        .delete()
+        .eq('id', affiliationId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error: any) {
+      console.error('removeCoachAffiliation Error:', error);
       return { success: false, error: error.message };
     }
   },
@@ -248,7 +486,6 @@ export const partnerService = {
 
   async approveVenueApplication(applicationId: string) {
     try {
-      // Read the application first so we preserve multi-sport fields after RPC runs
       const { data: appRow } = await supabase
         .from('venue_applications')
         .select('*')
@@ -261,7 +498,6 @@ export const partnerService = {
 
       if (error) throw error;
 
-      // Sync `sports` and `sport_configs` onto the newly created venue row
       if (appRow) {
         const parsedSports: string[] =
           Array.isArray(appRow.sports) && appRow.sports.length > 0
