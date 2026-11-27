@@ -28,7 +28,11 @@ import {
   Plus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { partnerService, type SportConfig } from '@/lib/services/partnerService';
+import {
+  partnerService,
+  type SportConfig,
+  type CoachVenueAffiliation,
+} from '@/lib/services/partnerService';
 import { bookingService, type Booking } from '@/lib/services/bookingService';
 import type { Venue, OperatingHours } from '@/lib/data';
 import { money } from '@/lib/constants';
@@ -273,6 +277,18 @@ export default function Dashboard({
   const [masterViewMode, setMasterViewMode] = useState<'list' | 'grid'>('list');
   const [currentTime, setCurrentTime] = useState<Date>(() => new Date());
 
+  // Venue Coach Roster & Requests States
+  const [venueCoaches, setVenueCoaches] = useState<CoachVenueAffiliation[]>([]);
+  const [coachInviteEmail, setCoachInviteEmail] = useState('');
+  const [coachInviteName, setCoachInviteName] = useState('');
+  const [coachInviteSport, setCoachInviteSport] = useState('Badminton');
+  const [isAddingVenueCoach, setIsAddingVenueCoach] = useState(false);
+
+  // Coach Portal Venue Affiliation States
+  const [coachVenueLinks, setCoachVenueLinks] = useState<CoachVenueAffiliation[]>([]);
+  const [applyTargetVenueId, setApplyTargetVenueId] = useState('');
+  const [isApplyingToVenue, setIsApplyingToVenue] = useState(false);
+
   // Live venue bookings mapped from Supabase `bookings` columns
   const [venueBookings, setVenueBookings] = useState<DashboardBooking[]>(
     bookings || []
@@ -380,6 +396,32 @@ export default function Dashboard({
     fetchVenueBookings();
   }, [fetchVenueBookings]);
 
+  const loadVenueCoaches = useCallback(async () => {
+    if (!selectedVenue?.id) {
+      setVenueCoaches([]);
+      return;
+    }
+    const list = await partnerService.getVenueCoachAffiliations(selectedVenue.id);
+    setVenueCoaches(list);
+  }, [selectedVenue?.id]);
+
+  const loadCoachAffiliations = useCallback(async () => {
+    if (!user?.id) {
+      setCoachVenueLinks([]);
+      return;
+    }
+    const list = await partnerService.getCoachAffiliations(user.id, user.email);
+    setCoachVenueLinks(list);
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    loadVenueCoaches();
+  }, [loadVenueCoaches]);
+
+  useEffect(() => {
+    loadCoachAffiliations();
+  }, [loadCoachAffiliations]);
+
   // All sports available at this venue (from venue metadata + sport_configs + any existing bookings)
   const venueSportOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -401,6 +443,12 @@ export default function Dashboard({
 
     return Array.from(map.values());
   }, [selectedVenue, venueBookings]);
+
+  useEffect(() => {
+    if (venueSportOptions.length > 0 && !venueSportOptions.includes(coachInviteSport)) {
+      setCoachInviteSport(venueSportOptions[0]);
+    }
+  }, [venueSportOptions, coachInviteSport]);
 
   // Default / sync selectedMatrixSport whenever the venue or its sport options change
   useEffect(() => {
@@ -821,6 +869,53 @@ export default function Dashboard({
     setIsSwapMode(false);
     setDraggedCell(null);
     setDragOverKey(null);
+  };
+
+  // Venue Owner: Add a coach to this venue by email
+  const handleVenueAddCoach = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedVenue?.id || !coachInviteEmail.trim()) return;
+    setIsAddingVenueCoach(true);
+    const res = await partnerService.addCoachToVenueByEmail(
+      { id: selectedVenue.id, name: selectedVenue.name },
+      {
+        coachEmail: coachInviteEmail,
+        coachName: coachInviteName,
+        sport: coachInviteSport,
+      }
+    );
+    setIsAddingVenueCoach(false);
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
+    setCoachInviteEmail('');
+    setCoachInviteName('');
+    await loadVenueCoaches();
+  };
+
+  // Coach Portal: Apply to affiliate with a specific venue
+  const handleCoachApplyVenue = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.id || !applyTargetVenueId) return;
+    const targetVenue = venues.find((v) => v.id === applyTargetVenueId);
+    if (!targetVenue) return;
+    setIsApplyingToVenue(true);
+    const res = await partnerService.applyCoachToVenue(
+      user.id,
+      { id: targetVenue.id, name: targetVenue.name },
+      {
+        coachName: user.user_metadata?.full_name || user.email?.split('@')[0],
+        coachEmail: user.email,
+      }
+    );
+    setIsApplyingToVenue(false);
+    if (!res.success) {
+      alert(res.error);
+      return;
+    }
+    setApplyTargetVenueId('');
+    await loadCoachAffiliations();
   };
 
   // Persist court updates (including splitting partial multi-court bookings) in Supabase
@@ -1353,7 +1448,7 @@ export default function Dashboard({
         ...selectedVenue,
         sport: updatedSportsList.join(', '),
         total_courts: totalAllSportCourts,
-        ...( { sports: updatedSportsList, sport_configs: existingConfigs } as any ),
+        ...({ sports: updatedSportsList, sport_configs: existingConfigs } as any),
       };
 
       if (onVenueUpdate) {
@@ -2239,6 +2334,150 @@ export default function Dashboard({
               )}
             </div>
 
+            {/* VENUE COACH ROSTER & REQUESTS */}
+            <div className="mt-6 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
+                    Venue Coaches & Requests
+                  </h2>
+                  <p className="mt-0.5 text-xs text-black/50 dark:text-[#F7F8F4]/60">
+                    Add coaches to {selectedVenue.name} or review coaches applying to teach here.
+                  </p>
+                </div>
+
+                <label className="inline-flex items-center gap-2 text-xs font-bold text-black/70 dark:text-[#F7F8F4]/80 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={(selectedVenue as any).show_affiliated_coaches !== false}
+                    onChange={async (e) => {
+                      const nextVal = e.target.checked;
+                      await partnerService.updateVenueDetails(selectedVenue.id, {
+                        show_affiliated_coaches: nextVal,
+                      });
+                      onVenueUpdate?.({
+                        ...selectedVenue,
+                        ...({ show_affiliated_coaches: nextVal } as any),
+                      });
+                    }}
+                    className="h-4 w-4 accent-[#81971d]"
+                  />
+                  Display affiliated coaches on venue listing (coming soon)
+                </label>
+              </div>
+
+              {/* Add a coach by email */}
+              <form
+                onSubmit={handleVenueAddCoach}
+                className="mt-4 flex flex-wrap items-center gap-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-3 text-xs"
+              >
+                <input
+                  type="email"
+                  required
+                  value={coachInviteEmail}
+                  onChange={(e) => setCoachInviteEmail(e.target.value)}
+                  placeholder="Coach email address *"
+                  className="flex-1 min-w-[180px] rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 font-semibold text-[#101310] dark:text-[#F7F8F4] outline-none"
+                />
+                <input
+                  type="text"
+                  value={coachInviteName}
+                  onChange={(e) => setCoachInviteName(e.target.value)}
+                  placeholder="Coach name (optional)"
+                  className="w-44 rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 font-semibold text-[#101310] dark:text-[#F7F8F4] outline-none"
+                />
+                <select
+                  value={coachInviteSport}
+                  onChange={(e) => setCoachInviteSport(e.target.value)}
+                  className="rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
+                >
+                  {venueSportOptions.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={isAddingVenueCoach}
+                  className="rounded-xl bg-[#101310] dark:bg-[#d8ff3e] px-4 py-2 font-black text-[#d8ff3e] dark:text-[#101310] disabled:opacity-50"
+                >
+                  {isAddingVenueCoach ? 'Adding...' : '+ Add Coach'}
+                </button>
+              </form>
+
+              {/* List of affiliated & pending coaches */}
+              {venueCoaches.length > 0 ? (
+                <div className="mt-4 divide-y divide-black/10 dark:divide-white/10 rounded-2xl border border-black/10 dark:border-white/10">
+                  {venueCoaches.map((c) => (
+                    <div
+                      key={c.id}
+                      className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div>
+                        <p className="text-sm font-black text-[#101310] dark:text-[#F7F8F4]">
+                          {c.coach_name}{' '}
+                          <span className="text-xs font-normal text-black/50 dark:text-[#F7F8F4]/60">
+                            ({c.coach_email})
+                          </span>
+                        </p>
+                        <p className="text-xs text-black/55 dark:text-[#F7F8F4]/60 mt-0.5">
+                          {c.sport} · {money(c.hourly_rate)}/hr
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {c.status === 'pending_venue_approval' ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await partnerService.respondToCoachAffiliation(c.id, 'approved');
+                                await loadVenueCoaches();
+                              }}
+                              className="rounded-xl bg-[#d8ff3e] px-3 py-1.5 text-xs font-black text-[#101310]"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await partnerService.respondToCoachAffiliation(c.id, 'rejected');
+                                await loadVenueCoaches();
+                              }}
+                              className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-black text-white"
+                            >
+                              Decline
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span className="rounded-full bg-[#edf5d2] dark:bg-[#d8ff3e]/20 px-3 py-1 text-[10px] font-black text-[#5d7112] dark:text-[#d8ff3e]">
+                              Affiliated
+                            </span>
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                await partnerService.removeCoachAffiliation(c.id);
+                                await loadVenueCoaches();
+                              }}
+                              className="text-xs font-bold text-red-600 dark:text-red-400 underline"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-xs text-black/45 dark:text-[#F7F8F4]/50">
+                  No coaches affiliated with this venue yet.
+                </p>
+              )}
+            </div>
+
             {/* VENUE MASTER RESERVATION LIST */}
             <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -2519,6 +2758,110 @@ export default function Dashboard({
               </div>
               <p className="mt-2 text-3xl font-black text-[#101310] dark:text-[#F7F8F4]">0</p>
             </div>
+          </div>
+
+          {/* VENUE AFFILIATIONS (APPLY TO SPECIFIC VENUES) */}
+          <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">
+            <h2 className="text-2xl font-black tracking-tight text-[#101310] dark:text-[#F7F8F4]">
+              Venue Affiliations
+            </h2>
+            <p className="mt-1 text-xs text-black/50 dark:text-[#F7F8F4]/60">
+              Apply to teach at specific partner venues or manage your current venue affiliations.
+            </p>
+
+            <form
+              onSubmit={handleCoachApplyVenue}
+              className="mt-4 flex flex-wrap items-center gap-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-3 text-xs"
+            >
+              <select
+                required
+                value={applyTargetVenueId}
+                onChange={(e) => setApplyTargetVenueId(e.target.value)}
+                className="flex-1 min-w-[220px] rounded-xl border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-3 py-2 font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
+              >
+                <option value="">Select a venue to apply to...</option>
+                {venues
+                  .filter(
+                    (v) =>
+                      !coachVenueLinks.some(
+                        (link) =>
+                          link.venue_id === v.id &&
+                          ['approved', 'pending_venue_approval'].includes(link.status)
+                      )
+                  )
+                  .map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} ({v.area} · {v.sport})
+                    </option>
+                  ))}
+              </select>
+
+              <button
+                type="submit"
+                disabled={isApplyingToVenue || !applyTargetVenueId}
+                className="rounded-xl bg-[#101310] dark:bg-[#d8ff3e] px-5 py-2 font-black text-[#d8ff3e] dark:text-[#101310] disabled:opacity-40"
+              >
+                {isApplyingToVenue ? 'Sending Request...' : 'Apply to Venue'}
+              </button>
+            </form>
+
+            {coachVenueLinks.filter((l) => l.venue_id).length > 0 ? (
+              <div className="mt-4 divide-y divide-black/10 dark:divide-white/10 rounded-2xl border border-black/10 dark:border-white/10">
+                {coachVenueLinks
+                  .filter((l) => l.venue_id)
+                  .map((link) => {
+                    const matchedVenue = venues.find((v) => v.id === link.venue_id);
+                    return (
+                      <div
+                        key={link.id}
+                        className="flex items-center justify-between gap-3 p-4"
+                      >
+                        <div>
+                          <p className="text-sm font-black text-[#101310] dark:text-[#F7F8F4]">
+                            {matchedVenue?.name || link.venue_name || 'Partner Venue'}
+                          </p>
+                          <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60">
+                            {matchedVenue?.area || ''} · {link.sport}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`rounded-full px-3 py-1 text-[10px] font-black ${
+                              link.status === 'approved'
+                                ? 'bg-[#edf5d2] dark:bg-[#d8ff3e]/20 text-[#5d7112] dark:text-[#d8ff3e]'
+                                : link.status === 'rejected'
+                                ? 'bg-red-100 dark:bg-red-500/20 text-red-600 dark:text-red-400'
+                                : 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300'
+                            }`}
+                          >
+                            {link.status === 'approved'
+                              ? 'Affiliated'
+                              : link.status === 'rejected'
+                              ? 'Declined'
+                              : 'Pending Venue Approval'}
+                          </span>
+
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await partnerService.removeCoachAffiliation(link.id);
+                              await loadCoachAffiliations();
+                            }}
+                            className="text-xs font-bold text-red-600 dark:text-red-400 underline"
+                          >
+                            {link.status === 'approved' ? 'Leave' : 'Withdraw'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <p className="mt-4 text-xs text-black/45 dark:text-[#F7F8F4]/50">
+                You are not affiliated with any venues yet. Apply above or have a venue owner add your email.
+              </p>
+            )}
           </div>
 
           <div className="mt-8 rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-8 shadow-sm">

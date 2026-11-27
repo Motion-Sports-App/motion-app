@@ -60,13 +60,11 @@ export default function PartnerOnboardingView({
     description: '',
   });
 
-  // Coach Form (Freelance by default)
+  // Standalone Coach Registration Form
   const [coachData, setCoachData] = useState({
-    employmentType: 'freelance' as 'freelance' | 'venue_affiliated',
     sport: 'Badminton',
     hourlyRate: 500,
     bio: '',
-    venueId: venues[0]?.id || '',
   });
 
   const fetchApplicationStatuses = useCallback(async () => {
@@ -109,7 +107,7 @@ export default function PartnerOnboardingView({
     setVenueData((prev) => {
       const exists = prev.sports.includes(sportName);
       if (exists) {
-        if (prev.sports.length === 1) return prev; // Keep at least 1 sport selected
+        if (prev.sports.length === 1) return prev;
         const nextSports = prev.sports.filter((s) => s !== sportName);
         const nextConfigs = { ...prev.sportConfigs };
         delete nextConfigs[sportName];
@@ -228,20 +226,12 @@ export default function PartnerOnboardingView({
   const handleCoachSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isCoachLocked) {
-      setErrorMsg('You already have an active or pending coach application.');
+      setErrorMsg('You already have an active coach profile on Motion.');
       return;
     }
 
     setSubmitting(true);
     setErrorMsg('');
-
-    if (coachData.employmentType === 'venue_affiliated' && !coachData.venueId) {
-      setErrorMsg('Please select a venue to affiliate with.');
-      setSubmitting(false);
-      return;
-    }
-
-    const selectedVenue = venues.find((v) => v.id === coachData.venueId);
 
     const res = await partnerService.submitCoachApplication(user.id, {
       coachName: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Coach',
@@ -249,28 +239,20 @@ export default function PartnerOnboardingView({
       sport: coachData.sport,
       hourlyRate: Number(coachData.hourlyRate),
       bio: coachData.bio,
-      employmentType: coachData.employmentType,
-      venueId: coachData.employmentType === 'venue_affiliated' ? coachData.venueId : undefined,
     });
 
     setSubmitting(false);
 
     if (res.success) {
-      setCoachAppStatus(
-        coachData.employmentType === 'freelance' ? 'approved' : 'pending_venue_approval'
-      );
+      setCoachAppStatus('approved');
       await fetchApplicationStatuses();
-      if (coachData.employmentType === 'freelance') {
-        setSuccessMsg('Your freelance coach profile is live! Players can now find and book training sessions with you.');
-      } else {
-        setSuccessMsg(
-          `Application sent! Your request to coach at ${selectedVenue?.name || 'the venue'} is now pending approval from the venue manager.`
-        );
-      }
+      setSuccessMsg(
+        'Your coach profile is live! You can manage sessions and apply to affiliate with specific venues from your Coach Portal.'
+      );
       setMode('success');
-    } else if (res.error?.includes('unique_active_coach_affiliation_per_user') || res.error?.includes('duplicate')) {
-      setCoachAppStatus('pending_venue_approval');
-      setErrorMsg('You already have an active or pending coach application.');
+    } else if (res.error?.includes('duplicate')) {
+      setCoachAppStatus('approved');
+      setErrorMsg('You already have an active coach profile.');
     } else {
       setErrorMsg(res.error || 'Failed to submit application.');
     }
@@ -368,12 +350,10 @@ export default function PartnerOnboardingView({
               <h2 className="mt-5 text-2xl font-black text-[#101310] dark:text-[#F7F8F4]">
                 {coachAppStatus === 'approved'
                   ? 'Coach Account Active'
-                  : coachAppStatus === 'pending_venue_approval'
-                  ? 'Coach Request Sent'
                   : 'Register as a Coach'}
               </h2>
               <p className="mt-2 text-xs leading-5 text-black/60 dark:text-[#F7F8F4]/70">
-                Register as a freelance coach or affiliate with a partner venue to receive client training sessions.
+                Create your coach profile on Motion, set your hourly rate, and connect with partner venues anytime.
               </p>
 
               {checkingStatus ? (
@@ -384,13 +364,9 @@ export default function PartnerOnboardingView({
                 <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#586c12] dark:text-[#d8ff3e]">
                   <CheckCircle2 size={15} /> Coach Profile Active
                 </span>
-              ) : coachAppStatus === 'pending_venue_approval' ? (
-                <span className="mt-6 inline-flex items-center gap-1.5 text-xs font-black text-[#81971d] dark:text-[#d8ff3e]">
-                  <Clock size={15} /> Pending Venue Approval
-                </span>
               ) : (
                 <span className="mt-6 inline-block text-xs font-black text-[#101310] dark:text-[#F7F8F4] group-hover:underline">
-                  Apply as Coach (Freelance or Venue) ↗
+                  Apply as Coach ↗
                 </span>
               )}
             </div>
@@ -432,7 +408,6 @@ export default function PartnerOnboardingView({
               </div>
             </div>
 
-            {/* MULTI-SPORT SELECTOR */}
             <div>
               <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">
                 Sports Offered * (Select one or more)
@@ -457,7 +432,6 @@ export default function PartnerOnboardingView({
                 })}
               </div>
 
-              {/* PER-SPORT COURTS & HOURLY RATE BREAKDOWN */}
               <div className="mt-3 space-y-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-4">
                 {venueData.sports.map((sport) => {
                   const cfg = venueData.sportConfigs[sport] || {
@@ -563,59 +537,11 @@ export default function PartnerOnboardingView({
       {mode === 'coach_form' && (
         <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-10">
           <h2 className="text-2xl font-black text-[#101310] dark:text-[#F7F8F4]">Coach Registration</h2>
-          <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60 mt-1">Register as a freelance coach or affiliate with a partner court venue.</p>
+          <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60 mt-1">
+            Apply to become a certified coach on Motion. Once registered, you can connect or apply to specific venues anytime from your Coach Portal.
+          </p>
 
           <form onSubmit={handleCoachSubmit} className="mt-6 space-y-4">
-            {/* Employment Type Selector */}
-            <div>
-              <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase mb-2">Coaching Setup *</label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setCoachData({ ...coachData, employmentType: 'freelance' })}
-                  className={`rounded-2xl border p-4 text-left transition ${
-                    coachData.employmentType === 'freelance'
-                      ? 'border-black dark:border-[#d8ff3e] bg-[#101310] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
-                      : 'border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-100 dark:hover:bg-white/10'
-                  }`}
-                >
-                  <p className="font-extrabold text-sm">⚡ Freelance Coach</p>
-                  <p className="mt-1 text-[11px] opacity-70">No venue required. Instant activation on Motion.</p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setCoachData({ ...coachData, employmentType: 'venue_affiliated' })}
-                  className={`rounded-2xl border p-4 text-left transition ${
-                    coachData.employmentType === 'venue_affiliated'
-                      ? 'border-black dark:border-[#d8ff3e] bg-[#101310] dark:bg-[#d8ff3e] text-white dark:text-[#101310]'
-                      : 'border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-[#101310] dark:text-[#F7F8F4] hover:bg-gray-100 dark:hover:bg-white/10'
-                  }`}
-                >
-                  <p className="font-extrabold text-sm">🏟️ Venue Affiliated</p>
-                  <p className="mt-1 text-[11px] opacity-70">Requires approval from partner venue manager.</p>
-                </button>
-              </div>
-            </div>
-
-            {/* Venue Selector (Only shown if venue_affiliated) */}
-            {coachData.employmentType === 'venue_affiliated' && (
-              <div>
-                <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Select Partner Venue *</label>
-                <select
-                  value={coachData.venueId}
-                  onChange={(e) => setCoachData({ ...coachData, venueId: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-2 text-xs font-bold text-[#101310] dark:text-[#F7F8F4] outline-none"
-                >
-                  {venues.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name} ({v.area} · {v.sport})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Coaching Sport *</label>
@@ -673,11 +599,7 @@ export default function PartnerOnboardingView({
                 disabled={submitting || isCoachLocked}
                 className="flex-1 rounded-full bg-[#101310] dark:bg-[#d8ff3e] py-3 text-xs font-black text-white dark:text-[#101310] hover:bg-[#30372a] dark:hover:bg-[#c9f02e] disabled:opacity-50"
               >
-                {submitting
-                  ? 'Registering...'
-                  : coachData.employmentType === 'freelance'
-                  ? 'Complete Freelance Registration'
-                  : 'Submit Venue Approval Request'}
+                {submitting ? 'Submitting Application...' : 'Submit Coach Application'}
               </button>
             </div>
           </form>
