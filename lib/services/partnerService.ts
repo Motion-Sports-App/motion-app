@@ -1,13 +1,22 @@
 import { supabase } from '@/lib/supabase';
 
+export interface SportConfig {
+  total_courts: number;
+  price_per_hour: number;
+  operating_hours?: OperatingHours;
+}
+
 export interface VenueApplicationData {
   name: string;
   sport: string;
+  sports?: string[];
+  sportConfigs?: Record<string, SportConfig>;
   area: string;
   address: string;
   totalCourts: number;
   price: number;
   description?: string;
+  applicantEmail?: string;
 }
 
 export interface CoachApplicationData {
@@ -33,6 +42,8 @@ export interface MatrixData {
   price?: number;
   price_per_hour?: number;
   operating_hours: OperatingHours;
+  sports?: string[];
+  sport_configs?: Record<string, SportConfig>;
 }
 
 export const partnerService = {
@@ -87,7 +98,41 @@ export const partnerService = {
       }
 
       const { data: userData } = await supabase.auth.getUser();
-      const userEmail = userData.user?.email || '';
+      const userEmail = data.applicantEmail || userData.user?.email || '';
+
+      const selectedSports =
+        data.sports && data.sports.length > 0
+          ? data.sports
+          : data.sport
+              .split(',')
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+      const normalizedConfigs: Record<string, SportConfig> = {};
+      selectedSports.forEach((s) => {
+        const existingCfg = data.sportConfigs?.[s];
+        normalizedConfigs[s] = {
+          total_courts: Number(existingCfg?.total_courts ?? data.totalCourts ?? 4),
+          price_per_hour: Number(existingCfg?.price_per_hour ?? data.price ?? 350),
+          operating_hours: existingCfg?.operating_hours || {
+            open_time: '08:00',
+            close_time: '22:00',
+            slot_duration_minutes: 60,
+          },
+        };
+      });
+
+      const totalCourtsSum =
+        Object.values(normalizedConfigs).reduce(
+          (sum, cfg) => sum + Number(cfg.total_courts || 0),
+          0
+        ) || Number(data.totalCourts);
+
+      const prices = Object.values(normalizedConfigs)
+        .map((cfg) => Number(cfg.price_per_hour || 0))
+        .filter((p) => p > 0);
+      const basePrice =
+        prices.length > 0 ? Math.min(...prices) : Number(data.price);
 
       const { data: result, error } = await supabase
         .from('venue_applications')
@@ -96,11 +141,13 @@ export const partnerService = {
             user_id: userId,
             applicant_email: userEmail,
             name: data.name,
-            sport: data.sport,
+            sport: selectedSports.join(', '),
+            sports: selectedSports,
+            sport_configs: normalizedConfigs,
             area: data.area,
             address: data.address,
-            total_courts: Number(data.totalCourts),
-            price: Number(data.price),
+            total_courts: totalCourtsSum,
+            price: basePrice,
             description: data.description || '',
             status: 'pending',
           },
@@ -157,7 +204,10 @@ export const partnerService = {
             bio: data.bio,
             employment_type: data.employmentType,
             venue_id: data.venueId || null,
-            status: data.employmentType === 'freelance' ? 'approved' : 'pending_venue_approval',
+            status:
+              data.employmentType === 'freelance'
+                ? 'approved'
+                : 'pending_venue_approval',
           },
         ])
         .select();
@@ -198,11 +248,69 @@ export const partnerService = {
 
   async approveVenueApplication(applicationId: string) {
     try {
+      // Read the application first so we preserve multi-sport fields after RPC runs
+      const { data: appRow } = await supabase
+        .from('venue_applications')
+        .select('*')
+        .eq('id', applicationId)
+        .maybeSingle();
+
       const { data, error } = await supabase.rpc('approve_venue_application', {
         p_application_id: applicationId,
       });
 
       if (error) throw error;
+
+      // Sync `sports` and `sport_configs` onto the newly created venue row
+      if (appRow) {
+        const parsedSports: string[] =
+          Array.isArray(appRow.sports) && appRow.sports.length > 0
+            ? appRow.sports
+            : String(appRow.sport || '')
+                .split(',')
+                .map((s: string) => s.trim())
+                .filter(Boolean);
+
+        const defaultConfigs: Record<string, SportConfig> = {};
+        parsedSports.forEach((s: string) => {
+          defaultConfigs[s] = appRow.sport_configs?.[s] || {
+            total_courts: Number(appRow.total_courts || 4),
+            price_per_hour: Number(appRow.price || 350),
+            operating_hours: {
+              open_time: '08:00',
+              close_time: '22:00',
+              slot_duration_minutes: 60,
+            },
+          };
+        });
+
+        const newVenueId =
+          typeof data === 'string'
+            ? data
+            : data?.venue_id || data?.id || null;
+
+        if (newVenueId) {
+          await supabase
+            .from('venues')
+            .update({
+              sport: parsedSports.join(', '),
+              sports: parsedSports,
+              sport_configs: defaultConfigs,
+            })
+            .eq('id', newVenueId);
+        } else if (appRow.user_id && appRow.name) {
+          await supabase
+            .from('venues')
+            .update({
+              sport: parsedSports.join(', '),
+              sports: parsedSports,
+              sport_configs: defaultConfigs,
+            })
+            .eq('name', appRow.name)
+            .or(`user_id.eq.${appRow.user_id},owner_id.eq.${appRow.user_id}`);
+        }
+      }
+
       return { success: true, data };
     } catch (error: any) {
       console.error('approveVenueApplication Error:', error);
@@ -301,6 +409,17 @@ export const partnerService = {
         operating_hours: matrixData.operating_hours,
         updated_at: new Date().toISOString(),
       };
+
+      if (matrixData.sports !== undefined) {
+        payload.sports = matrixData.sports;
+        if (matrixData.sports.length > 0) {
+          payload.sport = matrixData.sports.join(', ');
+        }
+      }
+
+      if (matrixData.sport_configs !== undefined) {
+        payload.sport_configs = matrixData.sport_configs;
+      }
 
       if (priceValue !== undefined) {
         payload.price_per_hour = Number(priceValue);

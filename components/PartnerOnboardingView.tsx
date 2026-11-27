@@ -9,9 +9,19 @@ import {
   ShieldAlert,
   Clock,
 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
-import { partnerService } from '@/lib/services/partnerService';
+import { partnerService, type SportConfig } from '@/lib/services/partnerService';
 import type { Venue } from '@/lib/data';
+
+const VENUE_SPORT_OPTIONS = [
+  'Badminton',
+  'Tennis',
+  'Padel',
+  'Pickleball',
+  'Basketball',
+  'Futsal',
+  'Squash',
+  'Table Tennis',
+];
 
 export default function PartnerOnboardingView({
   user,
@@ -34,14 +44,19 @@ export default function PartnerOnboardingView({
   const [coachAppStatus, setCoachAppStatus] = useState<'pending_venue_approval' | 'approved' | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(true);
 
-  // Venue Form
+  // Multi-Sport Venue Form
   const [venueData, setVenueData] = useState({
     name: '',
-    sport: 'Badminton',
+    sports: ['Badminton'] as string[],
+    sportConfigs: {
+      Badminton: {
+        total_courts: 4,
+        price_per_hour: 350,
+        operating_hours: { open_time: '08:00', close_time: '22:00', slot_duration_minutes: 60 },
+      },
+    } as Record<string, SportConfig>,
     area: 'Sukhumvit',
     address: '',
-    totalCourts: 4,
-    price: 350,
     description: '',
   });
 
@@ -90,6 +105,53 @@ export default function PartnerOnboardingView({
   const isVenueLocked = Boolean(venueAppStatus);
   const isCoachLocked = Boolean(coachAppStatus);
 
+  const toggleVenueSport = (sportName: string) => {
+    setVenueData((prev) => {
+      const exists = prev.sports.includes(sportName);
+      if (exists) {
+        if (prev.sports.length === 1) return prev; // Keep at least 1 sport selected
+        const nextSports = prev.sports.filter((s) => s !== sportName);
+        const nextConfigs = { ...prev.sportConfigs };
+        delete nextConfigs[sportName];
+        return { ...prev, sports: nextSports, sportConfigs: nextConfigs };
+      }
+
+      return {
+        ...prev,
+        sports: [...prev.sports, sportName],
+        sportConfigs: {
+          ...prev.sportConfigs,
+          [sportName]: {
+            total_courts: 2,
+            price_per_hour: 350,
+            operating_hours: {
+              open_time: '08:00',
+              close_time: '22:00',
+              slot_duration_minutes: 60,
+            },
+          },
+        },
+      };
+    });
+  };
+
+  const updateSportConfigField = (
+    sportName: string,
+    field: 'total_courts' | 'price_per_hour',
+    value: number
+  ) => {
+    setVenueData((prev) => ({
+      ...prev,
+      sportConfigs: {
+        ...prev.sportConfigs,
+        [sportName]: {
+          ...prev.sportConfigs[sportName],
+          [field]: value,
+        },
+      },
+    }));
+  };
+
   if (!user) {
     return (
       <section className="mx-auto min-h-[75vh] max-w-3xl px-5 py-12 text-center">
@@ -120,10 +182,34 @@ export default function PartnerOnboardingView({
       return;
     }
 
+    if (venueData.sports.length === 0) {
+      setErrorMsg('Please select at least one sport for your venue.');
+      return;
+    }
+
     setSubmitting(true);
     setErrorMsg('');
 
-    const res = await partnerService.submitVenueApplication(user.id, venueData);
+    const totalCourtsSum = venueData.sports.reduce(
+      (sum, s) => sum + Number(venueData.sportConfigs[s]?.total_courts || 0),
+      0
+    );
+    const primarySport = venueData.sports[0];
+    const primaryPrice = Number(venueData.sportConfigs[primarySport]?.price_per_hour || 350);
+
+    const res = await partnerService.submitVenueApplication(user.id, {
+      name: venueData.name,
+      sport: venueData.sports.join(', '),
+      sports: venueData.sports,
+      sportConfigs: venueData.sportConfigs,
+      area: venueData.area,
+      address: venueData.address,
+      totalCourts: totalCourtsSum,
+      price: primaryPrice,
+      description: venueData.description,
+      applicantEmail: user.email,
+    });
+
     setSubmitting(false);
 
     if (res.success) {
@@ -234,7 +320,7 @@ export default function PartnerOnboardingView({
                   : 'Register a Venue'}
               </h2>
               <p className="mt-2 text-xs leading-5 text-black/60 dark:text-[#F7F8F4]/70">
-                List your courts, set custom time slots, track bookings, and automate reservation schedules.
+                List your courts across one or multiple sports, set custom time slots, and manage bookings.
               </p>
 
               {checkingStatus ? (
@@ -316,10 +402,10 @@ export default function PartnerOnboardingView({
         <div className="rounded-3xl border border-black/10 dark:border-white/10 bg-white dark:bg-[#16171A] p-6 sm:p-10">
           <h2 className="text-2xl font-black text-[#101310] dark:text-[#F7F8F4]">Venue Registration</h2>
           <p className="text-xs text-black/50 dark:text-[#F7F8F4]/60 mt-1">
-            Provide venue details. Submissions require Motion review before going live.
+            Select all sports available at your venue and configure court counts and hourly rates for each.
           </p>
 
-          <form onSubmit={handleVenueSubmit} className="mt-6 space-y-4">
+          <form onSubmit={handleVenueSubmit} className="mt-6 space-y-5">
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Venue Name *</label>
@@ -334,22 +420,6 @@ export default function PartnerOnboardingView({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Primary Sport *</label>
-                <select
-                  value={venueData.sport}
-                  onChange={(e) => setVenueData({ ...venueData, sport: e.target.value })}
-                  className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none"
-                >
-                  <option>Badminton</option>
-                  <option>Tennis</option>
-                  <option>Basketball</option>
-                  <option>Futsal</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div>
                 <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Area *</label>
                 <input
                   type="text"
@@ -360,29 +430,88 @@ export default function PartnerOnboardingView({
                   className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none"
                 />
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Total Courts *</label>
-                <input
-                  type="number"
-                  min={1}
-                  required
-                  value={venueData.totalCourts}
-                  onChange={(e) => setVenueData({ ...venueData, totalCourts: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none"
-                />
+            {/* MULTI-SPORT SELECTOR */}
+            <div>
+              <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">
+                Sports Offered * (Select one or more)
+              </label>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {VENUE_SPORT_OPTIONS.map((sport) => {
+                  const isSelected = venueData.sports.includes(sport);
+                  return (
+                    <button
+                      key={sport}
+                      type="button"
+                      onClick={() => toggleVenueSport(sport)}
+                      className={`rounded-full border px-3.5 py-1.5 text-xs font-black transition ${
+                        isSelected
+                          ? 'border-[#101310] dark:border-[#d8ff3e] bg-[#101310] dark:bg-[#d8ff3e] text-[#d8ff3e] dark:text-[#101310]'
+                          : 'border-black/15 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] text-black/70 dark:text-[#F7F8F4]/75 hover:border-black/35'
+                      }`}
+                    >
+                      {isSelected ? `✓ ${sport}` : `+ ${sport}`}
+                    </button>
+                  );
+                })}
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-black/60 dark:text-[#F7F8F4]/70 uppercase">Price per hour (฿) *</label>
-                <input
-                  type="number"
-                  min={50}
-                  required
-                  value={venueData.price}
-                  onChange={(e) => setVenueData({ ...venueData, price: Number(e.target.value) })}
-                  className="mt-1 w-full rounded-xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] px-3 py-2 text-xs text-[#101310] dark:text-[#F7F8F4] outline-none"
-                />
+              {/* PER-SPORT COURTS & HOURLY RATE BREAKDOWN */}
+              <div className="mt-3 space-y-2.5 rounded-2xl border border-black/10 dark:border-white/10 bg-[#f7f8f4] dark:bg-[#0B0B0C] p-4">
+                {venueData.sports.map((sport) => {
+                  const cfg = venueData.sportConfigs[sport] || {
+                    total_courts: 2,
+                    price_per_hour: 350,
+                  };
+                  return (
+                    <div
+                      key={sport}
+                      className="grid grid-cols-1 gap-3 sm:grid-cols-[1.2fr_1fr_1fr] sm:items-center border-b border-black/5 dark:border-white/5 pb-2.5 last:border-b-0 last:pb-0"
+                    >
+                      <span className="text-xs font-black text-[#101310] dark:text-[#F7F8F4]">
+                        {sport}
+                      </span>
+
+                      <label className="flex items-center justify-between gap-2 text-[11px] font-bold text-black/60 dark:text-[#F7F8F4]/70">
+                        <span>Courts:</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={50}
+                          required
+                          value={cfg.total_courts}
+                          onChange={(e) =>
+                            updateSportConfigField(
+                              sport,
+                              'total_courts',
+                              Math.max(1, Number(e.target.value))
+                            )
+                          }
+                          className="w-20 rounded-lg border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-2.5 py-1 text-right text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4] outline-none"
+                        />
+                      </label>
+
+                      <label className="flex items-center justify-between gap-2 text-[11px] font-bold text-black/60 dark:text-[#F7F8F4]/70">
+                        <span>Rate (฿/hr):</span>
+                        <input
+                          type="number"
+                          min={50}
+                          required
+                          value={cfg.price_per_hour}
+                          onChange={(e) =>
+                            updateSportConfigField(
+                              sport,
+                              'price_per_hour',
+                              Math.max(0, Number(e.target.value))
+                            )
+                          }
+                          className="w-24 rounded-lg border border-black/15 dark:border-white/10 bg-white dark:bg-[#16171A] px-2.5 py-1 text-right text-xs font-extrabold text-[#101310] dark:text-[#F7F8F4] outline-none"
+                        />
+                      </label>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
@@ -497,6 +626,8 @@ export default function PartnerOnboardingView({
                 >
                   <option>Badminton</option>
                   <option>Tennis</option>
+                  <option>Padel</option>
+                  <option>Pickleball</option>
                   <option>Basketball</option>
                   <option>Futsal</option>
                 </select>
